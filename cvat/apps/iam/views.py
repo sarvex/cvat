@@ -70,14 +70,12 @@ def get_context(request):
     if membership and not membership.is_active:
         membership = None
 
-    context = {
+    return {
         "privilege": groups[0] if groups else None,
         "membership": membership,
         "organization": organization,
         "visibility": org_filter,
     }
-
-    return context
 
 class ContextMiddleware:
     def __init__(self, get_response):

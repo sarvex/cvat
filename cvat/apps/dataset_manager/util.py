@@ -23,15 +23,13 @@ def make_zip_archive(src_path, dst_path):
 
 def bulk_create(db_model, objects, flt_param):
     if objects:
-        if flt_param:
-            if 'postgresql' in settings.DATABASES["default"]["ENGINE"]:
-                return db_model.objects.bulk_create(objects)
-            else:
-                ids = list(db_model.objects.filter(**flt_param).values_list('id', flat=True))
-                db_model.objects.bulk_create(objects)
-
-                return list(db_model.objects.exclude(id__in=ids).filter(**flt_param))
-        else:
+        if not flt_param:
             return db_model.objects.bulk_create(objects)
 
+        if 'postgresql' in settings.DATABASES["default"]["ENGINE"]:
+            return db_model.objects.bulk_create(objects)
+        ids = list(db_model.objects.filter(**flt_param).values_list('id', flat=True))
+        db_model.objects.bulk_create(objects)
+
+        return list(db_model.objects.exclude(id__in=ids).filter(**flt_param))
     return []

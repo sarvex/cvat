@@ -48,7 +48,7 @@ def import_modules(source_code: str):
         module = import_.module if import_.module else import_.name
         loaded_module = importlib.import_module(module)
 
-        if not import_.name == module:
+        if import_.name != module:
             loaded_module = getattr(loaded_module, import_.name)
 
         if import_.alias:
@@ -69,22 +69,21 @@ def execute_python_code(source_code, global_vars=None, local_vars=None):
         error_class = err.__class__.__name__
         details = err.args[0]
         line_number = err.lineno
-        raise InterpreterError("{} at line {}: {}".format(error_class, line_number, details))
+        raise InterpreterError(f"{error_class} at line {line_number}: {details}")
     except AssertionError as err:
         # AssertionError doesn't contain any args and line number
         error_class = err.__class__.__name__
-        raise InterpreterError("{}".format(error_class))
+        raise InterpreterError(f"{error_class}")
     except Exception as err:
         error_class = err.__class__.__name__
         details = err.args[0]
         _, _, tb = sys.exc_info()
         line_number = traceback.extract_tb(tb)[-1][1]
-        raise InterpreterError("{} at line {}: {}".format(error_class, line_number, details))
+        raise InterpreterError(f"{error_class} at line {line_number}: {details}")
 
 def av_scan_paths(*paths):
-    if 'yes' == os.environ.get('CLAM_AV'):
-        command = ['clamscan', '--no-summary', '-i', '-o']
-        command.extend(paths)
+    if os.environ.get('CLAM_AV') == 'yes':
+        command = ['clamscan', '--no-summary', '-i', '-o', *paths]
         res = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) # nosec
         if res.returncode:
             raise ValidationError(res.stdout)
@@ -112,9 +111,7 @@ def md5_hash(frame):
 def parse_specific_attributes(specific_attributes):
     assert isinstance(specific_attributes, str), 'Specific attributes must be a string'
     parsed_specific_attributes = urllib.parse.parse_qsl(specific_attributes)
-    return {
-        key: value for (key, value) in parsed_specific_attributes
-    } if parsed_specific_attributes else dict()
+    return dict(parsed_specific_attributes) if parsed_specific_attributes else {}
 
 
 def parse_exception_message(msg):
@@ -143,7 +140,7 @@ def process_failed_job(rq_job):
     return parse_exception_message(exc_info)
 
 def configure_dependent_job(queue, rq_id, rq_func, db_storage, filename, key, request):
-    rq_job_id_download_file = rq_id + f'?action=download_{filename}'
+    rq_job_id_download_file = f'{rq_id}?action=download_{filename}'
     rq_job_download_file = queue.fetch_job(rq_job_id_download_file)
     if not rq_job_download_file:
         # note: boto3 resource isn't pickleable, so we can't use storage
@@ -195,10 +192,7 @@ def reverse(viewname, *, args=None, kwargs=None,
 
     url = _reverse(viewname, args, kwargs, request)
 
-    if query_params:
-        return f'{url}?{urlencode(query_params)}'
-
-    return url
+    return f'{url}?{urlencode(query_params)}' if query_params else url
 
 def build_field_filter_params(field: str, value: Any) -> Dict[str, str]:
     """

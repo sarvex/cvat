@@ -9,13 +9,13 @@ __plugins = {}
 
 def add_plugin(name, function, order, exc_ok = False):
     if order not in ["before", "after"]:
-        raise Exception("Order may be 'before' or 'after' only. Got {}.".format(order))
+        raise Exception(f"Order may be 'before' or 'after' only. Got {order}.")
 
     if not callable(function):
         raise Exception("'function' argument should be a callable element")
 
     if not isinstance(name, str):
-        raise Exception("'name' argument should be a string. Got {}.".format(type(name)))
+        raise Exception(f"'name' argument should be a string. Got {type(name)}.")
 
     if name not in __plugins:
         __plugins[name] = {

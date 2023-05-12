@@ -28,11 +28,7 @@ def get_lookup_fields(view, fields: Optional[Iterator[str]] = None) -> Dict[str,
         fields = getattr(view, DEFAULT_FILTER_FIELDS_ATTR, None) or []
 
     lookup_overrides = getattr(view, DEFAULT_LOOKUP_MAP_ATTR, None) or {}
-    lookup_fields = {
-        field: lookup_overrides.get(field, field)
-        for field in fields
-    }
-    return lookup_fields
+    return {field: lookup_overrides.get(field, field) for field in fields}
 
 
 class SearchFilter(filters.SearchFilter):
@@ -148,7 +144,7 @@ class JsonLogicFilter(filters.BaseFilterBackend):
         elif op == '!!':
             return self._build_Q(args, lookup_fields)
         elif op == 'var':
-            return Q(**{args + '__isnull': False})
+            return Q(**{f'{args}__isnull': False})
         elif op in ['==', '<', '>', '<=', '>='] and len(args) == 2:
             var = lookup_fields[args[0]['var']]
             q_var = var + {
@@ -162,13 +158,13 @@ class JsonLogicFilter(filters.BaseFilterBackend):
         elif op == 'in':
             if isinstance(args[0], dict):
                 var = lookup_fields[args[0]['var']]
-                return Q(**{var + '__in': args[1]})
+                return Q(**{f'{var}__in': args[1]})
             else:
                 var = lookup_fields[args[1]['var']]
-                return Q(**{var + '__contains': args[0]})
+                return Q(**{f'{var}__contains': args[0]})
         elif op == '<=' and len(args) == 3:
             var = lookup_fields[args[1]['var']]
-            return Q(**{var + '__gte': args[0]}) & Q(**{var + '__lte': args[2]})
+            return Q(**{f'{var}__gte': args[0]}) & Q(**{f'{var}__lte': args[2]})
         else:
             raise ValidationError(f'filter: {op} operation with {args} arguments is not implemented')
 
@@ -176,9 +172,9 @@ class JsonLogicFilter(filters.BaseFilterBackend):
         try:
             rules = json.loads(json_rules)
             if not len(rules):
-                raise ValidationError(f"filter shouldn't be empty")
+                raise ValidationError("filter shouldn't be empty")
         except json.decoder.JSONDecodeError:
-            raise ValidationError(f'filter: Json syntax should be used')
+            raise ValidationError('filter: Json syntax should be used')
 
         return rules
 
@@ -193,8 +189,7 @@ class JsonLogicFilter(filters.BaseFilterBackend):
         return queryset.filter(q_object)
 
     def filter_queryset(self, request, queryset, view):
-        json_rules = request.query_params.get(self.filter_param)
-        if json_rules:
+        if json_rules := request.query_params.get(self.filter_param):
             parsed_rules = self._parse_query(json_rules)
             lookup_fields = self._get_lookup_fields(view)
             queryset = self.apply_filter(queryset, parsed_rules, lookup_fields=lookup_fields)
@@ -289,12 +284,18 @@ class SimpleFilter(DjangoFilterBackend):
 
         MetaBase = getattr(self.filterset_base, 'Meta', object)
 
+
+
         class AutoFilterSet(self.filterset_base, metaclass=FilterSet.__class__):
-            filter_names = { v: k for k, v in lookup_fields.items() }
+
 
             class Meta(MetaBase): # pylint: disable=useless-object-inheritance
+                filter_names = { v: k for k, v in lookup_fields.items() }
+
                 model = queryset.model
                 fields = list(lookup_fields.values())
+
+
 
         return AutoFilterSet
 
@@ -324,10 +325,9 @@ class SimpleFilter(DjangoFilterBackend):
                 # Choices use their labels as filter values
                 parameter_schema = { 'type': 'string' }
             else:
-                raise Exception("Filter field '{}' type '{}' is not supported".format(
-                    '.'.join([view.basename, view.action, field_name]),
-                    filter_
-                ))
+                raise Exception(
+                    f"Filter field '{'.'.join([view.basename, view.action, field_name])}' type '{filter_}' is not supported"
+                )
 
             parameter = {
                 'name': field_name,

@@ -8,7 +8,7 @@ def alter_label_colors(apps, schema_editor):
 
     for task in Task.objects.all():
         labels = Label.objects.filter(task_id=task.id).order_by('id')
-        label_names = list()
+        label_names = []
         for label in labels:
             label.color = get_label_color(label.name, label_names)
             label_names.append(label.color)

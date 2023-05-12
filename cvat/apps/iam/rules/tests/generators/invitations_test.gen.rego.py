@@ -143,7 +143,7 @@ def get_data(scope, context, ownership, privilege, membership, resource, same_or
 def _get_name(prefix, **kwargs):
     name = prefix
     for k, v in kwargs.items():
-        prefix = "_" + str(k)
+        prefix = f"_{str(k)}"
         if isinstance(v, dict):
             if "id" not in v:
                 name += _get_name(prefix, **v)
@@ -162,10 +162,7 @@ def is_valid(scope, context, ownership, privilege, membership, resource, same_or
         return False
     if scope == "list" and ownership != "None":
         return False
-    if context == "sandbox" and same_org is False:
-        return False
-
-    return True
+    return context != "sandbox" or same_org is not False
 
 
 def gen_test_rego(name):

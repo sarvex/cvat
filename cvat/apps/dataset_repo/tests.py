@@ -66,14 +66,11 @@ class FakeHexShaObject:
 class GitRepo(git.Repo):
     def clone(self, path, progress=None, multi_options=None, **kwargs):
         _ = (progress, multi_options, *kwargs)
-        if osp.isfile(osp.join(path, '.git')):
-            return self
-        else:
-            return git.Repo.init(path=path)
+        return self if osp.isfile(osp.join(path, '.git')) else git.Repo.init(path=path)
 
     def merge_base(self, *rev, **kwargs):
         _ = (rev, *kwargs)
-        hexsha = self.git.show_ref('refs/heads/{}'.format(rev[1])).split(" ")
+        hexsha = self.git.show_ref(f'refs/heads/{rev[1]}').split(" ")
         return [FakeHexShaObject(hexsha[0])]
 
 
@@ -193,15 +190,20 @@ class GitDatasetRepoTest(APITestCase):
 
     def _run_api_v2_job_id_annotation(self, jid, data, user):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/jobs/{}/annotations?action=create'.format(jid),
-                data=data, format="json")
+            response = self.client.patch(
+                f'/api/jobs/{jid}/annotations?action=create',
+                data=data,
+                format="json",
+            )
 
         return response
 
     def _get_jobs(self, task_id):
         with ForceLogin(self.admin, self.client):
-            values = get_paginated_collection(lambda page:
-                self.client.get("/api/jobs?task_id={}&page={}".format(task_id, page))
+            values = get_paginated_collection(
+                lambda page: self.client.get(
+                    f"/api/jobs?task_id={task_id}&page={page}"
+                )
             )
         return values
 
@@ -222,19 +224,19 @@ class GitDatasetRepoTest(APITestCase):
                 }
             ]
         }
-        images = {"client_files[0]": generate_image_file("image_0.jpg")}
-        images["image_quality"] = 75
-
+        images = {
+            "client_files[0]": generate_image_file("image_0.jpg"),
+            "image_quality": 75,
+        }
         with ForceLogin(self.user, self.client):
             response = self.client.post('/api/tasks', data=data, format="json")
             assert response.status_code == status.HTTP_201_CREATED, response.status_code
             tid = response.data["id"]
 
-            response = self.client.post("/api/tasks/%s/data" % tid,
-                                        data=images)
+            response = self.client.post(f"/api/tasks/{tid}/data", data=images)
             assert response.status_code == status.HTTP_202_ACCEPTED, response.status_code
 
-            response = self.client.get("/api/tasks/%s" % tid)
+            response = self.client.get(f"/api/tasks/{tid}")
             task = response.data
 
             db_task = Task.objects.get(pk=task["id"])
@@ -252,9 +254,9 @@ class GitDatasetRepoTest(APITestCase):
             fake_git = GitDatasetRepoTest.FakeGit(url)
             try:
                 actual = TestGit.parse_url(fake_git)
-                self.assertEqual(expected, actual, "URL #%s: '%s'" % (i, url))
+                self.assertEqual(expected, actual, f"URL #{i}: '{url}'")
             except Exception: # pylint: disable=broad-except
-                self.fail("URL #%s: '%s'" % (i, url))
+                self.fail(f"URL #{i}: '{url}'")
 
     def test_correct_urls_can_be_parsed(self):
         hosts = ['host.zone', '1.2.3.4']
@@ -273,7 +275,7 @@ class GitDatasetRepoTest(APITestCase):
                 protocol=protocol, host=host, port=port,
                 repo_group=repo_group, repo=repo, git=git_suffix
             )
-            expected = ('git', host + port, '%s/%s.git' % (repo_group, repo))
+            expected = 'git', host + port, f'{repo_group}/{repo}.git'
             samples.append((expected, url))
 
         # git samples
@@ -284,7 +286,7 @@ class GitDatasetRepoTest(APITestCase):
                 user=user, host=host, port=port,
                 repo_group=repo_group, repo=repo, git=git_suffix
             )
-            expected = (user, host + port, '%s/%s.git' % (repo_group, repo))
+            expected = user, host + port, f'{repo_group}/{repo}.git'
             samples.append((expected, url))
 
         self._check_correct_urls(samples)
@@ -340,7 +342,7 @@ class GitDatasetRepoTest(APITestCase):
 
         repo = cvat_git.get_rep()
         heads = [head.name for head in repo.heads]
-        self.assertTrue('cvat_{}_{}'.format(tid, task_name) in heads)
+        self.assertTrue(f'cvat_{tid}_{task_name}' in heads)
 
     @mock.patch('git.cmd.Git.execute', new=GitCmd.execute)
     @mock.patch('git.Repo.clone', new=GitRepo.clone)

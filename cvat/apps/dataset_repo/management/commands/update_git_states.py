@@ -16,6 +16,6 @@ class Command(BaseCommand):
             try:
                 update_states()
             except Exception as ex:
-                print("An error occurred during update task statuses: {}".format(str(ex)))
+                print(f"An error occurred during update task statuses: {str(ex)}")
             time.sleep(INTERVAL_SEC)
 

@@ -56,7 +56,7 @@ EXPORT_FORMATS = {}
 
 def format_for(export_format, mode):
     format_name = export_format
-    if export_format not in EXPORT_FORMATS:
+    if format_name not in EXPORT_FORMATS:
         if mode == "annotation":
             format_name = "CVAT for images 1.1"
         else:
@@ -65,15 +65,16 @@ def format_for(export_format, mode):
 
 
 def exporter(name, version, ext, display_name=None, enabled=True, dimension=DimensionType.DIM_2D):
-    assert name not in EXPORT_FORMATS, "Export format '%s' already registered" % name
+    assert name not in EXPORT_FORMATS, f"Export format '{name}' already registered"
     def wrap_with_params(f_or_cls):
         t = _wrap_format(f_or_cls, Exporter,
             name=name, ext=ext, version=version, display_name=display_name,
             enabled=enabled, dimension=dimension)
         key = t.DISPLAY_NAME
-        assert key not in EXPORT_FORMATS, "Export format '%s' already registered" % name
+        assert key not in EXPORT_FORMATS, f"Export format '{name}' already registered"
         EXPORT_FORMATS[key] = t
         return t
+
     return wrap_with_params
 
 IMPORT_FORMATS = {}
@@ -83,9 +84,10 @@ def importer(name, version, ext, display_name=None, enabled=True, dimension=Dime
             name=name, ext=ext, version=version, display_name=display_name,
             enabled=enabled, dimension=dimension)
         key = t.DISPLAY_NAME
-        assert key not in IMPORT_FORMATS, "Import format '%s' already registered" % name
+        assert key not in IMPORT_FORMATS, f"Import format '{name}' already registered"
         IMPORT_FORMATS[key] = t
         return t
+
     return wrap_with_params
 
 def make_importer(name):

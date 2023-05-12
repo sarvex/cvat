@@ -47,8 +47,8 @@ def handler(context, event):
     pred_classes = instances.pred_classes
     results = []
     for box, score, label in zip(pred_boxes, scores, pred_classes):
-        label = COCO_CATEGORIES[int(label)]["name"]
         if score >= threshold:
+            label = COCO_CATEGORIES[int(label)]["name"]
             results.append({
                 "confidence": str(float(score)),
                 "label": label,

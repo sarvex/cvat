@@ -71,7 +71,7 @@ def frame_path(db_task, frame):
     task_dirname = os.path.join(settings.DATA_ROOT, str(db_task.id))
     d1 = str(int(frame) // 10000)
     d2 = str(int(frame) // 100)
-    path = os.path.join(task_dirname, 'data', d1, d2, str(frame) + '.jpg')
+    path = os.path.join(task_dirname, 'data', d1, d2, f'{str(frame)}.jpg')
     return path
 
 

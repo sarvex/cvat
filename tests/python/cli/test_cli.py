@@ -73,7 +73,7 @@ class TestCLI:
     def fxt_new_task(self):
         files = generate_images(self.tmp_path, 5)
 
-        task = self.client.tasks.create_from_data(
+        return self.client.tasks.create_from_data(
             spec={
                 "name": "test_task",
                 "labels": [{"name": "car"}, {"name": "person"}],
@@ -81,8 +81,6 @@ class TestCLI:
             resource_type=ResourceType.LOCAL,
             resources=files,
         )
-
-        return task
 
     def run_cli(self, cmd: str, *args: str, expected_code: int = 0) -> str:
         run_cli(

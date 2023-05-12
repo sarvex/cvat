@@ -19,8 +19,7 @@ class Signer:
     @classmethod
     def get_salt(cls, url):
         normalized_url = furl(url).remove(cls.QUERY_PARAM).url.encode('utf-8')
-        salt = hashlib.sha256(normalized_url).hexdigest()
-        return salt
+        return hashlib.sha256(normalized_url).hexdigest()
 
     def sign(self, user, url):
         """

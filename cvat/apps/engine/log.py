@@ -18,25 +18,25 @@ def _get_project(pid):
     try:
         return Project.objects.get(pk=pid)
     except Exception:
-        raise Exception('{} key must be a project identifier'.format(pid))
+        raise Exception(f'{pid} key must be a project identifier')
 
 def _get_task(tid):
     try:
         return Task.objects.get(pk=tid)
     except Exception:
-        raise Exception('{} key must be a task identifier'.format(tid))
+        raise Exception(f'{tid} key must be a task identifier')
 
 def _get_job(jid):
     try:
         return Job.objects.select_related("segment__task").get(id=jid)
     except Exception:
-        raise Exception('{} key must be a job identifier'.format(jid))
+        raise Exception(f'{jid} key must be a job identifier')
 
 def _get_storage(storage_id):
     try:
         return CloudStorage.objects.get(pk=storage_id)
     except Exception:
-        raise Exception('{} key must be a cloud storage identifier'.format(storage_id))
+        raise Exception(f'{storage_id} key must be a cloud storage identifier')
 
 _opened_loggers: Dict[str, logging.Logger] = {}
 
@@ -84,7 +84,7 @@ class ProjectLoggerStorage(IndexedLogManager):
     def _create_logger(self, pid):
         project = _get_project(pid)
 
-        logger = logging.getLogger('cvat.server.project_{}'.format(pid))
+        logger = logging.getLogger(f'cvat.server.project_{pid}')
         server_file = logging.FileHandler(filename=project.get_log_path())
         formatter = logging.Formatter(LOGGING['formatters']['standard']['format'])
         server_file.setFormatter(formatter)
@@ -97,7 +97,7 @@ class TaskLoggerStorage(IndexedLogManager):
     def _create_logger(self, tid):
         task = _get_task(tid)
 
-        logger = logging.getLogger('cvat.server.task_{}'.format(tid))
+        logger = logging.getLogger(f'cvat.server.task_{tid}')
         server_file = logging.FileHandler(filename=task.get_log_path())
         formatter = logging.Formatter(LOGGING['formatters']['standard']['format'])
         server_file.setFormatter(formatter)
@@ -114,7 +114,7 @@ class CloudSourceLoggerStorage(IndexedLogManager):
     def _create_logger(self, sid):
         cloud_storage = _get_storage(sid)
 
-        logger = logging.getLogger('cvat.server.cloud_storage_{}'.format(sid))
+        logger = logging.getLogger(f'cvat.server.cloud_storage_{sid}')
         server_file = logging.FileHandler(filename=cloud_storage.get_log_path())
         formatter = logging.Formatter(LOGGING['formatters']['standard']['format'])
         server_file.setFormatter(formatter)
@@ -153,7 +153,7 @@ def close_all():
 
 @contextmanager
 def get_migration_logger(migration_name):
-    migration_log_file = '{}.log'.format(migration_name)
+    migration_log_file = f'{migration_name}.log'
     stdout = sys.stdout
     stderr = sys.stderr
     # redirect all stdout to the file

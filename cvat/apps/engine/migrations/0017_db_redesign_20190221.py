@@ -9,16 +9,14 @@ from cvat.apps.dataset_manager.task import _merge_table_rows
 # some modified functions to transer annotation
 def _bulk_create(db_model, db_alias, objects, flt_param):
     if objects:
-        if flt_param:
-            if 'postgresql' in settings.DATABASES["default"]["ENGINE"]:
-                return db_model.objects.using(db_alias).bulk_create(objects)
-            else:
-                ids = list(db_model.objects.using(db_alias).filter(**flt_param).values_list('id', flat=True))
-                db_model.objects.using(db_alias).bulk_create(objects)
-
-                return list(db_model.objects.using(db_alias).exclude(id__in=ids).filter(**flt_param))
-        else:
+        if not flt_param:
             return db_model.objects.using(db_alias).bulk_create(objects)
+        if 'postgresql' in settings.DATABASES["default"]["ENGINE"]:
+            return db_model.objects.using(db_alias).bulk_create(objects)
+        ids = list(db_model.objects.using(db_alias).filter(**flt_param).values_list('id', flat=True))
+        db_model.objects.using(db_alias).bulk_create(objects)
+
+        return list(db_model.objects.using(db_alias).exclude(id__in=ids).filter(**flt_param))
 
 def get_old_db_shapes(shape_type, db_job):
     def _get_shape_set(db_job, shape_type):
@@ -334,12 +332,12 @@ def copy_annotations_forward(apps, schema_editor):
 
 
     for task in Task.objects.all():
-        print("run anno migration for the task {}".format(task.id))
+        print(f"run anno migration for the task {task.id}")
         db_labels = {db_label.id:db_label for db_label in task.label_set.all()}
         db_attributes = {db_attr.id:db_attr for db_attr in AttributeSpec.objects.filter(label__task__id=task.id)}
         for segment in task.segment_set.prefetch_related('job_set').all():
             db_job = segment.job_set.first()
-            print("run anno migration for the job {}".format(db_job.id))
+            print(f"run anno migration for the job {db_job.id}")
             process_shapes(db_job, apps, db_labels, db_attributes, db_alias)
             process_paths(db_job, apps, db_labels, db_attributes, db_alias)
 

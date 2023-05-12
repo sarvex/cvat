@@ -48,8 +48,7 @@ class UserRegisterAPITestCase(APITestCase):
 
     def _run_api_v2_user_register(self, data):
         url = reverse('rest_register')
-        response = self.client.post(url, data, format='json')
-        return response
+        return self.client.post(url, data, format='json')
 
     def _check_response(self, response, data):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

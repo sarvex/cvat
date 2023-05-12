@@ -7,8 +7,7 @@ import numpy as np
 import sys
 from skimage.measure import find_contours, approximate_polygon
 import tensorflow as tf
-MASK_RCNN_DIR = os.path.abspath(os.environ.get('MASK_RCNN_DIR'))
-if MASK_RCNN_DIR:
+if MASK_RCNN_DIR := os.path.abspath(os.environ.get('MASK_RCNN_DIR')):
     sys.path.append(MASK_RCNN_DIR)  # To find local version of the library
 from mrcnn import model as modellib
 from mrcnn.config import Config

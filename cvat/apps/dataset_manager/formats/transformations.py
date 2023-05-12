@@ -40,7 +40,7 @@ class CVATRleToCOCORle(ItemTransform):
     @staticmethod
     def convert_mask(shape, img_h, img_w):
         rle = shape.points[:-4]
-        left, top, right = list(math.trunc(v) for v in shape.points[-4:-1])
+        left, top, right = [math.trunc(v) for v in shape.points[-4:-1]]
         mat = np.zeros((img_h, img_w), dtype=np.uint8)
         width = right - left + 1
         value = 0

@@ -37,7 +37,7 @@ class PasswordResetSerializerEx(PasswordResetSerializer):
         if hasattr(settings, 'UI_HOST') and settings.UI_HOST:
             domain = settings.UI_HOST
             if hasattr(settings, 'UI_PORT') and settings.UI_PORT:
-                domain += ':{}'.format(settings.UI_PORT)
+                domain += f':{settings.UI_PORT}'
         return {
             'domain_override': domain
         }

@@ -73,15 +73,17 @@ class _DbTestBase(APITestCase):
 
     def _put_api_v2_task_id_annotations(self, tid, data):
         with ForceLogin(self.user, self.client):
-            response = self.client.put("/api/tasks/%s/annotations" % tid,
-                data=data, format="json")
+            response = self.client.put(
+                f"/api/tasks/{tid}/annotations", data=data, format="json"
+            )
 
         return response
 
     def _put_api_v2_job_id_annotations(self, jid, data):
         with ForceLogin(self.user, self.client):
-            response = self.client.put("/api/jobs/%s/annotations" % jid,
-                data=data, format="json")
+            response = self.client.put(
+                f"/api/jobs/{jid}/annotations", data=data, format="json"
+            )
 
         return response
 
@@ -91,16 +93,19 @@ class _DbTestBase(APITestCase):
             assert response.status_code == status.HTTP_201_CREATED, response.status_code
             tid = response.data["id"]
 
-            response = self.client.post("/api/tasks/%s/data" % tid,
-                data=image_data)
+            response = self.client.post(f"/api/tasks/{tid}/data", data=image_data)
             assert response.status_code == status.HTTP_202_ACCEPTED, response.status_code
 
-            response = self.client.get("/api/tasks/%s" % tid)
+            response = self.client.get(f"/api/tasks/{tid}")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get("/api/labels?task_id=%s&page=%s" % (tid, page))
-                ))
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f"/api/labels?task_id={tid}&page={page}"
+                        )
+                    )
+                )
                 response.data["labels"] = labels_response
 
             task = response.data
@@ -253,20 +258,19 @@ class TaskExportTest(_DbTestBase):
                             "mutable": False,
                             "input_type": "select",
                             "default_value": "mazda",
-                            "values": ["bmw", "mazda", "renault"]
+                            "values": ["bmw", "mazda", "renault"],
                         },
                         {
                             "name": "parked",
                             "mutable": True,
                             "input_type": "checkbox",
-                            "default_value": False
+                            "default_value": False,
                         },
-                    ]
+                    ],
                 },
                 {"name": "person"},
-            ]
-        }
-        task.update(overrides)
+            ],
+        } | overrides
         return self._create_task(task, images)
 
     @staticmethod
@@ -482,9 +486,11 @@ class TaskExportTest(_DbTestBase):
 
     def _get_task_jobs(self, tid):
         with ForceLogin(self.user, self.client):
-            return get_paginated_collection(lambda page: self.client.get(
-                '/api/jobs?task_id=%s&page=%s' % (tid, page), format="json"
-            ))
+            return get_paginated_collection(
+                lambda page: self.client.get(
+                    f'/api/jobs?task_id={tid}&page={page}', format="json"
+                )
+            )
 
     def test_frames_outside_are_not_generated(self):
         # https://github.com/openvinotoolkit/cvat/issues/2827
@@ -738,9 +744,8 @@ class TaskAnnotationsImportTest(_DbTestBase):
             "name": "my task #1",
             "overlap": 0,
             "segment_size": 100,
-            "labels": labels
-        }
-        task.update(overrides)
+            "labels": labels,
+        } | overrides
         return self._create_task(task, images)
 
     def _generate_annotations(self, task, annotation_format):
@@ -888,17 +893,17 @@ class TaskAnnotationsImportTest(_DbTestBase):
                 ],
             }
 
-            if annotation_format == "VGGFace2 1.0":
-                shapes = [rectangle_shape_wo_attrs]
-            elif annotation_format == "CVAT 1.1":
+            if annotation_format == "CVAT 1.1":
                 shapes = [rectangle_shape_wo_attrs,
                     rectangle_shape_with_attrs]
                 tags = [tag_with_attrs, tag_wo_attrs]
             elif annotation_format == "MOTS PNG 1.0":
                 tracks = [track_wo_attrs]
+            elif annotation_format == "VGGFace2 1.0":
+                shapes = [rectangle_shape_wo_attrs]
             else:
                 shapes = [rectangle_shape_wo_attrs, \
-                    rectangle_shape_with_attrs]
+                        rectangle_shape_with_attrs]
                 tags = [tag_wo_attrs]
                 tracks = [track_wo_attrs]
 

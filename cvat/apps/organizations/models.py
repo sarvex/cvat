@@ -68,10 +68,7 @@ class Invitation(models.Model):
     def accept(self, date=None):
         if not self.membership.is_active:
             self.membership.is_active = True
-            if date is None:
-                self.membership.joined_date = timezone.now()
-            else:
-                self.membership.joined_date = date
+            self.membership.joined_date = timezone.now() if date is None else date
             self.membership.save()
 
     class Meta:

@@ -81,11 +81,10 @@ class WebhookViewSet(viewsets.ModelViewSet):
             "ping"
         ):
             return None
+        if self.request.method in SAFE_METHODS:
+            return WebhookReadSerializer
         else:
-            if self.request.method in SAFE_METHODS:
-                return WebhookReadSerializer
-            else:
-                return WebhookWriteSerializer
+            return WebhookWriteSerializer
 
     def get_queryset(self):
         queryset = super().get_queryset()

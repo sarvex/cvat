@@ -53,9 +53,9 @@ class LabelAttrToAttr(ItemTransform):
         if self._label is not None:
             labels = [ann for ann in annotations
                 if ann.type == AnnotationType.label \
-                    and ann.label == self._label]
+                        and ann.label == self._label]
             if len(labels) == 1:
-                attributes.update(labels[0].attributes)
+                attributes |= labels[0].attributes
                 annotations.remove(labels[0])
         return item.wrap(annotations=annotations, attributes=attributes)
 

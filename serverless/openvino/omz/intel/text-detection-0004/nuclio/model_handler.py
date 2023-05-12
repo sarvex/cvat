@@ -73,10 +73,7 @@ class PixelLinkDecoder():
             a_max = np.squeeze(a_max, axis=axis)
         out += a_max
 
-        if return_sign:
-            return out, sgn
-        else:
-            return out
+        return (out, sgn) if return_sign else out
 
     def _set_pixel_scores(self, pixel_scores):
         "get softmaxed properly shaped pixel scores"

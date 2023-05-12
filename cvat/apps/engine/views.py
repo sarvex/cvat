@@ -136,32 +136,35 @@ class ServerViewSet(viewsets.ViewSet):
             param = param[1:]
         directory = os.path.abspath(os.path.join(settings.SHARE_ROOT, param))
 
-        if directory.startswith(settings.SHARE_ROOT) and os.path.isdir(directory):
-            data = []
-            content = os.scandir(directory)
-            for entry in content:
-                entry_type = None
-                entry_mime_type = None
-                if entry.is_file():
-                    entry_type = "REG"
-                    entry_mime_type = get_mime(os.path.join(settings.SHARE_ROOT, entry))
-                elif entry.is_dir():
-                    entry_type = "DIR"
-                    entry_mime_type = "DIR"
+        if not directory.startswith(settings.SHARE_ROOT) or not os.path.isdir(
+            directory
+        ):
+            return Response(
+                f"{param} is an invalid directory",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = []
+        content = os.scandir(directory)
+        for entry in content:
+            entry_type = None
+            entry_mime_type = None
+            if entry.is_file():
+                entry_type = "REG"
+                entry_mime_type = get_mime(os.path.join(settings.SHARE_ROOT, entry))
+            elif entry.is_dir():
+                entry_type = "DIR"
+                entry_mime_type = "DIR"
 
-                if entry_type:
-                    data.append({
-                        "name": entry.name,
-                        "type": entry_type,
-                        "mime_type": entry_mime_type,
-                    })
+            if entry_type:
+                data.append({
+                    "name": entry.name,
+                    "type": entry_type,
+                    "mime_type": entry_mime_type,
+                })
 
-            serializer = FileInfoSerializer(many=True, data=data)
-            if serializer.is_valid(raise_exception=True):
-                return Response(serializer.data)
-        else:
-            return Response("{} is an invalid directory".format(param),
-                status=status.HTTP_400_BAD_REQUEST)
+        serializer = FileInfoSerializer(many=True, data=data)
+        if serializer.is_valid(raise_exception=True):
+            return Response(serializer.data)
 
     @staticmethod
     @extend_schema(
@@ -324,43 +327,41 @@ class ProjectViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
                 rq_func=dm.project.import_dataset_as_project,
                 rq_id=rq_id,
             )
-        else:
-            action = request.query_params.get("action", "").lower()
-            if action in ("import_status",):
-                queue = django_rq.get_queue(settings.CVAT_QUEUES.IMPORT_DATA.value)
-                rq_job = queue.fetch_job(rq_id)
-                if rq_job is None:
-                    return Response(status=status.HTTP_404_NOT_FOUND)
-                elif rq_job.is_finished:
-                    if rq_job.meta['tmp_file_descriptor']: os.close(rq_job.meta['tmp_file_descriptor'])
-                    os.remove(rq_job.meta['tmp_file'])
-                    if rq_job.dependency:
-                        rq_job.dependency.delete()
-                    rq_job.delete()
-                    return Response(status=status.HTTP_201_CREATED)
-                elif rq_job.is_failed or \
-                        rq_job.is_deferred and rq_job.dependency and rq_job.dependency.is_failed:
-                    exc_info = process_failed_job(rq_job)
+        action = request.query_params.get("action", "").lower()
+        if action not in ("import_status",):
+            return self.export_annotations(
+                request=request,
+                db_obj=self._object,
+                export_func=_export_annotations,
+                callback=dm.views.export_project_as_dataset
+            )
+        queue = django_rq.get_queue(settings.CVAT_QUEUES.IMPORT_DATA.value)
+        rq_job = queue.fetch_job(rq_id)
+        if rq_job is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        elif rq_job.is_finished:
+            if rq_job.meta['tmp_file_descriptor']: os.close(rq_job.meta['tmp_file_descriptor'])
+            os.remove(rq_job.meta['tmp_file'])
+            if rq_job.dependency:
+                rq_job.dependency.delete()
+            rq_job.delete()
+            return Response(status=status.HTTP_201_CREATED)
+        elif rq_job.is_failed or \
+                    rq_job.is_deferred and rq_job.dependency and rq_job.dependency.is_failed:
+            exc_info = process_failed_job(rq_job)
 
-                    return Response(
-                        data=str(exc_info),
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                    )
-                else:
-                    return Response(
-                        data=self._get_rq_response(
-                            settings.CVAT_QUEUES.IMPORT_DATA.value,
-                            rq_id,
-                        ),
-                        status=status.HTTP_202_ACCEPTED
-                    )
-            else:
-                return self.export_annotations(
-                    request=request,
-                    db_obj=self._object,
-                    export_func=_export_annotations,
-                    callback=dm.views.export_project_as_dataset
-                )
+            return Response(
+                data=str(exc_info),
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        else:
+            return Response(
+                data=self._get_rq_response(
+                    settings.CVAT_QUEUES.IMPORT_DATA.value,
+                    rq_id,
+                ),
+                status=status.HTTP_202_ACCEPTED
+            )
 
     @tus_chunk_action(detail=True, suffix_base="dataset")
     def append_dataset_chunk(self, request, pk, file_id):
@@ -393,8 +394,7 @@ class ProjectViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
                 conv_mask_to_poly=conv_mask_to_poly
             )
         elif self.action == 'import_backup':
-            filename = request.query_params.get("filename", "")
-            if filename:
+            if filename := request.query_params.get("filename", ""):
                 tmp_dir = backup.get_backup_dirname()
                 backup_file = os.path.join(tmp_dir, filename)
                 if os.path.isfile(backup_file):
@@ -539,8 +539,7 @@ class ProjectViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
         elif job.is_failed:
             response = { "state": "Failed", "message": job.exc_info }
         else:
-            response = { "state": "Started" }
-            response['message'] = job.meta.get('status', '')
+            response = {"state": "Started", 'message': job.meta.get('status', '')}
             response['progress'] = job.meta.get('progress', 0.)
 
         return response
@@ -552,7 +551,7 @@ class DataChunkGetter:
 
         if not data_type or data_type not in possible_data_type_values:
             raise ValidationError('Data type not specified or has wrong value')
-        elif data_type == 'chunk' or data_type == 'frame' or data_type == 'preview':
+        elif data_type in ['chunk', 'frame', 'preview']:
             if data_num is None:
                 raise ValidationError('Number is not specified')
             elif data_quality not in possible_quality_values:
@@ -561,7 +560,7 @@ class DataChunkGetter:
         self.type = data_type
         self.number = int(data_num) if data_num is not None else None
         self.quality = FrameProvider.Quality.COMPRESSED \
-            if data_quality == 'compressed' else FrameProvider.Quality.ORIGINAL
+                if data_quality == 'compressed' else FrameProvider.Quality.ORIGINAL
 
         self.dimension = task_dim
 
@@ -590,7 +589,7 @@ class DataChunkGetter:
                 path = os.path.realpath(frame_provider.get_chunk(self.number, self.quality))
                 return sendfile(request, path)
 
-            elif self.type == 'frame' or self.type == 'preview':
+            elif self.type in ['frame', 'preview']:
                 if not (start <= self.number <= stop):
                     raise ValidationError('The frame number should be in ' +
                         f'[{start}, {stop}] range')
@@ -613,11 +612,13 @@ class DataChunkGetter:
                 raise ValidationError('The frame number should be in ' +
                     f'[{start}, {stop}] range')
             else:
-                return Response(data='unknown data type {}.'.format(self.type),
-                    status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    data=f'unknown data type {self.type}.',
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         except (ValidationError, PermissionDenied, NotFound) as ex:
             msg = str(ex) if not isinstance(ex, ValidationError) else \
-                '\n'.join([str(d) for d in ex.detail])
+                    '\n'.join([str(d) for d in ex.detail])
             return Response(data=msg, status=ex.status_code)
 
 @extend_schema(tags=['tasks'])
@@ -790,21 +791,20 @@ class TaskViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
             filename = request.query_params.get("filename", "")
             conv_mask_to_poly = strtobool(request.query_params.get('conv_mask_to_poly', 'True'))
             tmp_dir = self._object.get_tmp_dirname()
-            if os.path.isfile(os.path.join(tmp_dir, filename)):
-                annotation_file = os.path.join(tmp_dir, filename)
-                return _import_annotations(
-                        request=request,
-                        filename=annotation_file,
-                        rq_id=(f"import:annotations-for-task.id{self._object.pk}-"
-                            f"in-{format_name.replace(' ', '_')}-by-{request.user}"),
-                        rq_func=dm.task.import_task_annotations,
-                        db_obj=self._object,
-                        format_name=format_name,
-                        conv_mask_to_poly=conv_mask_to_poly,
-                    )
-            else:
+            if not os.path.isfile(os.path.join(tmp_dir, filename)):
                 return Response(data='No such file were uploaded',
                         status=status.HTTP_400_BAD_REQUEST)
+            annotation_file = os.path.join(tmp_dir, filename)
+            return _import_annotations(
+                    request=request,
+                    filename=annotation_file,
+                    rq_id=(f"import:annotations-for-task.id{self._object.pk}-"
+                        f"in-{format_name.replace(' ', '_')}-by-{request.user}"),
+                    rq_func=dm.task.import_task_annotations,
+                    db_obj=self._object,
+                    format_name=format_name,
+                    conv_mask_to_poly=conv_mask_to_poly,
+                )
         elif self.action == 'data':
             task_data = self._object.data
             serializer = DataSerializer(task_data, data=request.data)
@@ -817,7 +817,7 @@ class TaskViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
             db_data = serializer.save()
             self._object.data = db_data
             self._object.save()
-            data = {k: v for k, v in serializer.data.items()}
+            data = dict(serializer.data.items())
 
             if 'job_file_mapping' in serializer.validated_data:
                 data['job_file_mapping'] = serializer.validated_data['job_file_mapping']
@@ -841,8 +841,7 @@ class TaskViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
             task.create(self._object, data, request)
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         elif self.action == 'import_backup':
-            filename = request.query_params.get("filename", "")
-            if filename:
+            if filename := request.query_params.get("filename", ""):
                 tmp_dir = backup.get_backup_dirname()
                 backup_file = os.path.join(tmp_dir, filename)
                 if os.path.isfile(backup_file):
@@ -889,7 +888,7 @@ class TaskViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
         parser_classes=_UPLOAD_PARSER_CLASSES)
     def data(self, request, pk):
         self._object = self.get_object() # call check_object_permissions as well
-        if request.method == 'POST' or request.method == 'OPTIONS':
+        if request.method in ['POST', 'OPTIONS']:
             task_data = self._object.data
             if not task_data:
                 task_data = Data.objects.create()
@@ -1014,7 +1013,7 @@ class TaskViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
             else:
                 return Response(data="Exporting annotations from a task without data is not allowed",
                     status=status.HTTP_400_BAD_REQUEST)
-        elif request.method == 'POST' or request.method == 'OPTIONS':
+        elif request.method in ['POST', 'OPTIONS']:
             format_name = request.query_params.get('format', '')
             return self.import_annotations(
                 request=request,
@@ -1024,8 +1023,7 @@ class TaskViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
                 rq_id = f"import:annotations-for-task.id{pk}-in-{format_name.replace(' ', '_')}-by-{request.user}"
             )
         elif request.method == 'PUT':
-            format_name = request.query_params.get('format', '')
-            if format_name:
+            if format_name := request.query_params.get('format', ''):
                 use_settings = strtobool(str(request.query_params.get('use_default_location', True)))
                 conv_mask_to_poly = strtobool(request.query_params.get('conv_mask_to_poly', 'True'))
                 obj = self._object if use_settings else request.query_params
@@ -1396,7 +1394,7 @@ class JobViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
                 get_data=dm.task.get_job_data,
             )
 
-        elif request.method == 'POST' or request.method == 'OPTIONS':
+        elif request.method in ['POST', 'OPTIONS']:
             format_name = request.query_params.get('format', '')
             return self.import_annotations(
                 request=request,
@@ -1408,8 +1406,7 @@ class JobViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
             )
 
         elif request.method == 'PUT':
-            format_name = request.query_params.get('format', '')
-            if format_name:
+            if format_name := request.query_params.get('format', ''):
                 use_settings = strtobool(str(request.query_params.get('use_default_location', True)))
                 conv_mask_to_poly = strtobool(request.query_params.get('conv_mask_to_poly', 'True'))
                 obj = self._object.segment.task if use_settings else request.query_params
@@ -1953,14 +1950,13 @@ class UserViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
 
         user = self.request.user
         is_self = int(self.kwargs.get("pk", 0)) == user.id or \
-            self.action == "self"
+                self.action == "self"
         if user.is_staff:
             return UserSerializer if not is_self else UserSerializer
+        if is_self and self.request.method in SAFE_METHODS:
+            return UserSerializer
         else:
-            if is_self and self.request.method in SAFE_METHODS:
-                return UserSerializer
-            else:
-                return BasicUserSerializer
+            return BasicUserSerializer
 
     @extend_schema(summary='Method returns an instance of a user who is currently authorized',
         responses={
@@ -2040,8 +2036,7 @@ class CloudStorageViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
             perm = CloudStoragePermission.create_scope_list(self.request)
             queryset = perm.filter(queryset)
 
-        provider_type = self.request.query_params.get('provider_type', None)
-        if provider_type:
+        if provider_type := self.request.query_params.get('provider_type', None):
             if provider_type in CloudProviderChoice.list():
                 return queryset.filter(provider_type=provider_type)
             raise ValidationError('Unsupported type of cloud provider')
@@ -2198,15 +2193,32 @@ def _import_annotations(request, rq_id, rq_func, db_obj, format_name,
     format_desc = {f.DISPLAY_NAME: f
         for f in dm.views.get_import_formats()}.get(format_name)
     if format_desc is None:
-        raise serializers.ValidationError(
-            "Unknown input format '{}'".format(format_name))
+        raise serializers.ValidationError(f"Unknown input format '{format_name}'")
     elif not format_desc.ENABLED:
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     queue = django_rq.get_queue(settings.CVAT_QUEUES.IMPORT_DATA.value)
-    rq_job = queue.fetch_job(rq_id)
+    if rq_job := queue.fetch_job(rq_id):
+        if rq_job.is_finished:
+            if rq_job.meta['tmp_file_descriptor']: os.close(rq_job.meta['tmp_file_descriptor'])
+            os.remove(rq_job.meta['tmp_file'])
+            rq_job.delete()
+            return Response(status=status.HTTP_201_CREATED)
+        elif rq_job.is_failed or \
+                rq_job.is_deferred and rq_job.dependency and rq_job.dependency.is_failed:
+            exc_info = process_failed_job(rq_job)
+            # RQ adds a prefix with exception class name
+            import_error_prefix = (
+                f'{CvatImportError.__module__}.{CvatImportError.__name__}'
+            )
+            if not exc_info.startswith(import_error_prefix):
+                return Response(data=exc_info,
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    if not rq_job:
+            exc_info = exc_info.replace(f'{import_error_prefix}: ', '')
+            return Response(data=exc_info,
+                status=status.HTTP_400_BAD_REQUEST)
+    else:
         # If filename is specified we consider that file was uploaded via TUS, so it exists in filesystem
         # Then we dont need to create temporary file
         # Or filename specify key in cloud storage so we need to download file
@@ -2214,40 +2226,44 @@ def _import_annotations(request, rq_id, rq_func, db_obj, format_name,
         dependent_job = None
         location = location_conf.get('location') if location_conf else Location.LOCAL
 
-        if not filename or location == Location.CLOUD_STORAGE:
-            if location != Location.CLOUD_STORAGE:
-                serializer = AnnotationFileSerializer(data=request.data)
-                if serializer.is_valid(raise_exception=True):
-                    anno_file = serializer.validated_data['annotation_file']
-                    fd, filename = mkstemp(prefix='cvat_{}'.format(db_obj.pk), dir=settings.TMP_FILES_ROOT)
-                    with open(filename, 'wb+') as f:
-                        for chunk in anno_file.chunks():
-                            f.write(chunk)
-            else:
-                assert filename, 'The filename was not specified'
+        if (
+            not filename
+            and location == Location.CLOUD_STORAGE
+            or filename
+            and location == Location.CLOUD_STORAGE
+        ):
+            assert filename, 'The filename was not specified'
 
-                try:
-                    storage_id = location_conf['storage_id']
-                except KeyError:
-                    raise serializers.ValidationError(
-                        'Cloud storage location was selected as the source,'
-                        ' but cloud storage id was not specified')
-                db_storage = get_cloud_storage_for_import_or_export(
-                    storage_id=storage_id, request=request,
-                    is_default=location_conf['is_default'])
+            try:
+                storage_id = location_conf['storage_id']
+            except KeyError:
+                raise serializers.ValidationError(
+                    'Cloud storage location was selected as the source,'
+                    ' but cloud storage id was not specified')
+            db_storage = get_cloud_storage_for_import_or_export(
+                storage_id=storage_id, request=request,
+                is_default=location_conf['is_default'])
 
-                key = filename
-                fd, filename = mkstemp(prefix='cvat_{}'.format(db_obj.pk), dir=settings.TMP_FILES_ROOT)
-                dependent_job = configure_dependent_job(
-                    queue=queue,
-                    rq_id=rq_id,
-                    rq_func=_download_file_from_bucket,
-                    db_storage=db_storage,
-                    filename=filename,
-                    key=key,
-                    request=request,
-                )
+            key = filename
+            fd, filename = mkstemp(prefix=f'cvat_{db_obj.pk}', dir=settings.TMP_FILES_ROOT)
+            dependent_job = configure_dependent_job(
+                queue=queue,
+                rq_id=rq_id,
+                rq_func=_download_file_from_bucket,
+                db_storage=db_storage,
+                filename=filename,
+                key=key,
+                request=request,
+            )
 
+        elif not filename:
+            serializer = AnnotationFileSerializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                anno_file = serializer.validated_data['annotation_file']
+                fd, filename = mkstemp(prefix=f'cvat_{db_obj.pk}', dir=settings.TMP_FILES_ROOT)
+                with open(filename, 'wb+') as f:
+                    for chunk in anno_file.chunks():
+                        f.write(chunk)
         av_scan_paths(filename)
         meta = {
             'tmp_file': filename,
@@ -2260,26 +2276,6 @@ def _import_annotations(request, rq_id, rq_func, db_obj, format_name,
             depends_on=dependent_job,
             meta={**meta, **get_rq_job_meta(request=request, db_obj=db_obj)}
         )
-    else:
-        if rq_job.is_finished:
-            if rq_job.meta['tmp_file_descriptor']: os.close(rq_job.meta['tmp_file_descriptor'])
-            os.remove(rq_job.meta['tmp_file'])
-            rq_job.delete()
-            return Response(status=status.HTTP_201_CREATED)
-        elif rq_job.is_failed or \
-                rq_job.is_deferred and rq_job.dependency and rq_job.dependency.is_failed:
-            exc_info = process_failed_job(rq_job)
-            # RQ adds a prefix with exception class name
-            import_error_prefix = '{}.{}'.format(
-                CvatImportError.__module__, CvatImportError.__name__)
-            if exc_info.startswith(import_error_prefix):
-                exc_info = exc_info.replace(import_error_prefix + ': ', '')
-                return Response(data=exc_info,
-                    status=status.HTTP_400_BAD_REQUEST)
-            else:
-                return Response(data=exc_info,
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
     return Response(status=status.HTTP_202_ACCEPTED)
 
 def _export_annotations(db_instance, rq_id, request, format_name, action, callback,
@@ -2297,9 +2293,7 @@ def _export_annotations(db_instance, rq_id, request, format_name, action, callba
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     queue = django_rq.get_queue(settings.CVAT_QUEUES.EXPORT_DATA.value)
-    rq_job = queue.fetch_job(rq_id)
-
-    if rq_job:
+    if rq_job := queue.fetch_job(rq_id):
         last_instance_update_time = timezone.localtime(db_instance.updated_date)
         if isinstance(db_instance, Project):
             tasks_update = list(map(lambda db_task: timezone.localtime(db_task.updated_date), db_instance.tasks.all()))
@@ -2309,61 +2303,57 @@ def _export_annotations(db_instance, rq_id, request, format_name, action, callba
         if request_time is None or request_time < last_instance_update_time:
             rq_job.cancel()
             rq_job.delete()
-        else:
-            if rq_job.is_finished:
-                file_path = rq_job.return_value
-                if action == "download" and osp.exists(file_path):
-                    rq_job.delete()
-
-                    timestamp = datetime.strftime(last_instance_update_time,
-                        "%Y_%m_%d_%H_%M_%S")
-                    filename = filename or \
-                        "{}_{}-{}-{}{}".format(
-                            db_instance.__class__.__name__.lower(),
-                            db_instance.name if isinstance(db_instance, (Task, Project)) else db_instance.id,
-                            timestamp, format_name, osp.splitext(file_path)[1]
-                        ).lower()
-
-                    # save annotation to specified location
-                    location = location_conf.get('location')
-                    if location == Location.LOCAL:
-                        return sendfile(request, file_path, attachment=True,
-                            attachment_filename=filename)
-                    elif location == Location.CLOUD_STORAGE:
-                        try:
-                            storage_id = location_conf['storage_id']
-                        except KeyError:
-                            return HttpResponseBadRequest(
-                                'Cloud storage location was selected as the destination,'
-                                ' but cloud storage id was not specified')
-                        db_storage = get_cloud_storage_for_import_or_export(
-                            storage_id=storage_id, request=request,
-                            is_default=location_conf['is_default'])
-                        storage = db_storage_to_storage_instance(db_storage)
-
-                        try:
-                            storage.upload_file(file_path, filename)
-                        except (ValidationError, PermissionDenied, NotFound) as ex:
-                            msg = str(ex) if not isinstance(ex, ValidationError) else \
-                                '\n'.join([str(d) for d in ex.detail])
-                            return Response(data=msg, status=ex.status_code)
-                        return Response(status=status.HTTP_200_OK)
-                    else:
-                        raise NotImplementedError()
-                else:
-                    if osp.exists(file_path):
-                        return Response(status=status.HTTP_201_CREATED)
-            elif rq_job.is_failed:
-                exc_info = str(rq_job.exc_info)
+        elif rq_job.is_finished:
+            file_path = rq_job.return_value
+            if action == "download" and osp.exists(file_path):
                 rq_job.delete()
-                return Response(exc_info,
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            else:
-                return Response(status=status.HTTP_202_ACCEPTED)
+
+                timestamp = datetime.strftime(last_instance_update_time,
+                    "%Y_%m_%d_%H_%M_%S")
+                filename = (
+                    filename
+                    or f"{db_instance.__class__.__name__.lower()}_{db_instance.name if isinstance(db_instance, (Task, Project)) else db_instance.id}-{timestamp}-{format_name}{osp.splitext(file_path)[1]}".lower()
+                )
+
+                # save annotation to specified location
+                location = location_conf.get('location')
+                if location == Location.LOCAL:
+                    return sendfile(request, file_path, attachment=True,
+                        attachment_filename=filename)
+                elif location == Location.CLOUD_STORAGE:
+                    try:
+                        storage_id = location_conf['storage_id']
+                    except KeyError:
+                        return HttpResponseBadRequest(
+                            'Cloud storage location was selected as the destination,'
+                            ' but cloud storage id was not specified')
+                    db_storage = get_cloud_storage_for_import_or_export(
+                        storage_id=storage_id, request=request,
+                        is_default=location_conf['is_default'])
+                    storage = db_storage_to_storage_instance(db_storage)
+
+                    try:
+                        storage.upload_file(file_path, filename)
+                    except (ValidationError, PermissionDenied, NotFound) as ex:
+                        msg = str(ex) if not isinstance(ex, ValidationError) else \
+                            '\n'.join([str(d) for d in ex.detail])
+                        return Response(data=msg, status=ex.status_code)
+                    return Response(status=status.HTTP_200_OK)
+                else:
+                    raise NotImplementedError()
+            elif osp.exists(file_path):
+                return Response(status=status.HTTP_201_CREATED)
+        elif rq_job.is_failed:
+            exc_info = str(rq_job.exc_info)
+            rq_job.delete()
+            return Response(exc_info,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response(status=status.HTTP_202_ACCEPTED)
 
     try:
         if request.scheme:
-            server_address = request.scheme + '://'
+            server_address = f'{request.scheme}://'
         server_address += request.get_host()
     except Exception:
         server_address = None
@@ -2386,62 +2376,58 @@ def _import_project_dataset(request, rq_id, rq_func, db_obj, format_name, filena
     format_desc = {f.DISPLAY_NAME: f
         for f in dm.views.get_import_formats()}.get(format_name)
     if format_desc is None:
-        raise serializers.ValidationError(
-            "Unknown input format '{}'".format(format_name))
+        raise serializers.ValidationError(f"Unknown input format '{format_name}'")
     elif not format_desc.ENABLED:
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     queue = django_rq.get_queue(settings.CVAT_QUEUES.IMPORT_DATA.value)
-    rq_job = queue.fetch_job(rq_id)
-
-    if not rq_job:
-        fd = None
-        dependent_job = None
-        location = location_conf.get('location') if location_conf else None
-        if not filename and location != Location.CLOUD_STORAGE:
-            serializer = DatasetFileSerializer(data=request.data)
-            if serializer.is_valid(raise_exception=True):
-                dataset_file = serializer.validated_data['dataset_file']
-                fd, filename = mkstemp(prefix='cvat_{}'.format(db_obj.pk), dir=settings.TMP_FILES_ROOT)
-                with open(filename, 'wb+') as f:
-                    for chunk in dataset_file.chunks():
-                        f.write(chunk)
-        elif location == Location.CLOUD_STORAGE:
-            assert filename, 'The filename was not specified'
-            try:
-                storage_id = location_conf['storage_id']
-            except KeyError:
-                raise serializers.ValidationError(
-                    'Cloud storage location was selected as the source,'
-                    ' but cloud storage id was not specified')
-            db_storage = get_cloud_storage_for_import_or_export(
-                storage_id=storage_id, request=request,
-                is_default=location_conf['is_default'])
-
-            key = filename
-            fd, filename = mkstemp(prefix='cvat_{}'.format(db_obj.pk), dir=settings.TMP_FILES_ROOT)
-            dependent_job = configure_dependent_job(
-                queue=queue,
-                rq_id=rq_id,
-                rq_func=_download_file_from_bucket,
-                db_storage=db_storage,
-                filename=filename,
-                key=key,
-                request=request,
-            )
-
-        rq_job = queue.enqueue_call(
-            func=rq_func,
-            args=(db_obj.pk, filename, format_name, conv_mask_to_poly),
-            job_id=rq_id,
-            meta={
-                'tmp_file': filename,
-                'tmp_file_descriptor': fd,
-                **get_rq_job_meta(request=request, db_obj=db_obj),
-            },
-            depends_on=dependent_job,
-        )
-    else:
+    if rq_job := queue.fetch_job(rq_id):
         return Response(status=status.HTTP_409_CONFLICT, data='Import job already exists')
 
+    fd = None
+    dependent_job = None
+    location = location_conf.get('location') if location_conf else None
+    if not filename and location != Location.CLOUD_STORAGE:
+        serializer = DatasetFileSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            dataset_file = serializer.validated_data['dataset_file']
+            fd, filename = mkstemp(prefix=f'cvat_{db_obj.pk}', dir=settings.TMP_FILES_ROOT)
+            with open(filename, 'wb+') as f:
+                for chunk in dataset_file.chunks():
+                    f.write(chunk)
+    elif location == Location.CLOUD_STORAGE:
+        assert filename, 'The filename was not specified'
+        try:
+            storage_id = location_conf['storage_id']
+        except KeyError:
+            raise serializers.ValidationError(
+                'Cloud storage location was selected as the source,'
+                ' but cloud storage id was not specified')
+        db_storage = get_cloud_storage_for_import_or_export(
+            storage_id=storage_id, request=request,
+            is_default=location_conf['is_default'])
+
+        key = filename
+        fd, filename = mkstemp(prefix=f'cvat_{db_obj.pk}', dir=settings.TMP_FILES_ROOT)
+        dependent_job = configure_dependent_job(
+            queue=queue,
+            rq_id=rq_id,
+            rq_func=_download_file_from_bucket,
+            db_storage=db_storage,
+            filename=filename,
+            key=key,
+            request=request,
+        )
+
+    rq_job = queue.enqueue_call(
+        func=rq_func,
+        args=(db_obj.pk, filename, format_name, conv_mask_to_poly),
+        job_id=rq_id,
+        meta={
+            'tmp_file': filename,
+            'tmp_file_descriptor': fd,
+            **get_rq_job_meta(request=request, db_obj=db_obj),
+        },
+        depends_on=dependent_job,
+    )
     return Response(status=status.HTTP_202_ACCEPTED)

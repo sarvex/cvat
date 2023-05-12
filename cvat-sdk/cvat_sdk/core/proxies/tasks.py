@@ -81,23 +81,21 @@ class Task(
 
         data = {"image_quality": 70}
 
-        data.update(
-            filter_dict(
-                params,
-                keep=[
-                    "chunk_size",
-                    "copy_data",
-                    "image_quality",
-                    "sorting_method",
-                    "start_frame",
-                    "stop_frame",
-                    "use_cache",
-                    "use_zip_chunks",
-                    "job_file_mapping",
-                    "filename_pattern",
-                    "cloud_storage_id",
-                ],
-            )
+        data |= filter_dict(
+            params,
+            keep=[
+                "chunk_size",
+                "copy_data",
+                "image_quality",
+                "sorting_method",
+                "start_frame",
+                "stop_frame",
+                "use_cache",
+                "use_zip_chunks",
+                "job_file_mapping",
+                "filename_pattern",
+                "cloud_storage_id",
+            ],
         )
         if params.get("frame_step") is not None:
             data["frame_filter"] = f"step={params.get('frame_step')}"

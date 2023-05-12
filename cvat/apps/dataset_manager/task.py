@@ -52,7 +52,7 @@ def _merge_table_rows(rows, keys_for_merge, field_id):
     # accordance with keys_for_merge structure.
     for row in rows:
         row_id = row[field_id]
-        if not row_id in merged_rows:
+        if row_id not in merged_rows:
             merged_rows[row_id] = dotdict(row)
             for key in keys_for_merge:
                 merged_rows[row_id][key] = []
@@ -263,12 +263,12 @@ class JobAnnotation:
             attributes = tag.pop("attributes", [])
             db_tag = models.LabeledImage(job=self.db_job, **tag)
             if db_tag.label_id not in self.db_labels:
-                raise AttributeError("label_id `{}` is invalid".format(db_tag.label_id))
+                raise AttributeError(f"label_id `{db_tag.label_id}` is invalid")
 
             for attr in attributes:
                 db_attrval = models.LabeledImageAttributeVal(**attr)
                 if db_attrval.spec_id not in self.db_attributes[db_tag.label_id]["all"]:
-                    raise AttributeError("spec_id `{}` is invalid".format(db_attrval.spec_id))
+                    raise AttributeError(f"spec_id `{db_attrval.spec_id}` is invalid")
                 db_attrval.tag_id = len(db_tags)
                 db_attrvals.append(db_attrval)
 
@@ -360,7 +360,7 @@ class JobAnnotation:
 
     @staticmethod
     def _extend_attributes(attributeval_set, default_attribute_values):
-        shape_attribute_specs_set = set(attr.spec_id for attr in attributeval_set)
+        shape_attribute_specs_set = {attr.spec_id for attr in attributeval_set}
         for db_attr in default_attribute_values:
             if db_attr.spec_id not in shape_attribute_specs_set:
                 attributeval_set.append(dotdict([

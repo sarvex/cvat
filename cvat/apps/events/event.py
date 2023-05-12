@@ -54,8 +54,8 @@ class EventScopeChoice:
         return sorted((val, val.upper()) for val in AllEvents.events)
 
 class AllEvents:
-    events = list(
+    events = [
         event_scope(action, resource)
         for resource, actions in EventScopes.RESOURCES.items()
         for action in actions
-    )
+    ]

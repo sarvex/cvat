@@ -73,14 +73,11 @@ class AnnotationIR:
         prev_shape = None
         for shape in track['shapes']:
             if prev_shape and not prev_shape['outside'] and \
-                    has_overlap(prev_shape['frame'], shape['frame']):
+                        has_overlap(prev_shape['frame'], shape['frame']):
                 return True
             prev_shape = shape
 
-        if not prev_shape['outside'] and prev_shape['frame'] <= stop:
-            return True
-
-        return False
+        return not prev_shape['outside'] and prev_shape['frame'] <= stop
 
     @classmethod
     def _slice_track(cls, track_, start, stop, dimension):
@@ -134,7 +131,7 @@ class AnnotationIR:
         for t in self.tracks:
             if self._is_track_inside(t, start, stop):
                 track = self._slice_track(t, start, stop, self.dimension)
-                if 0 < len(track['shapes']):
+                if len(track['shapes']) > 0:
                     splitted_tracks.append(track)
         splitted_data.tracks = splitted_tracks
 
@@ -344,8 +341,8 @@ class ShapeManager(ObjectManager):
 
                 return _calc_polygons_similarity(p0, p1)
             elif obj0["type"] == ShapeType.CUBOID and dimension == DimensionType.DIM_3D:
-                [x_c0, y_c0, z_c0] = obj0["points"][0:3]
-                [x_c1, y_c1, z_c1] = obj1["points"][0:3]
+                [x_c0, y_c0, z_c0] = obj0["points"][:3]
+                [x_c1, y_c1, z_c1] = obj1["points"][:3]
 
                 [x_len0, y_len0, z_len0] = obj0["points"][6:9]
                 [x_len1, y_len1, z_len1] = obj1["points"][6:9]
@@ -463,34 +460,33 @@ class TrackManager(ObjectManager):
 
     @staticmethod
     def _calc_objects_similarity(obj0, obj1, start_frame, overlap, dimension):
-        if obj0["label_id"] == obj1["label_id"]:
-            # Here start_frame is the start frame of next segment
-            # and stop_frame is the stop frame of current segment
-            # end_frame == stop_frame + 1
-            end_frame = start_frame + overlap
-            obj0_shapes = TrackManager.get_interpolated_shapes(obj0, start_frame, end_frame, dimension)
-            obj1_shapes = TrackManager.get_interpolated_shapes(obj1, start_frame, end_frame, dimension)
-            obj0_shapes_by_frame = {shape["frame"]:shape for shape in obj0_shapes}
-            obj1_shapes_by_frame = {shape["frame"]:shape for shape in obj1_shapes}
-            assert obj0_shapes_by_frame and obj1_shapes_by_frame
-
-            count, error = 0, 0
-            for frame in range(start_frame, end_frame):
-                shape0 = obj0_shapes_by_frame.get(frame)
-                shape1 = obj1_shapes_by_frame.get(frame)
-                if shape0 and shape1:
-                    if shape0["outside"] != shape1["outside"]:
-                        error += 1
-                    else:
-                        error += 1 - ShapeManager._calc_objects_similarity(shape0, shape1, start_frame, overlap, dimension)
-                    count += 1
-                elif shape0 or shape1:
-                    error += 1
-                    count += 1
-
-            return 1 - error / count
-        else:
+        if obj0["label_id"] != obj1["label_id"]:
             return 0
+        # Here start_frame is the start frame of next segment
+        # and stop_frame is the stop frame of current segment
+        # end_frame == stop_frame + 1
+        end_frame = start_frame + overlap
+        obj0_shapes = TrackManager.get_interpolated_shapes(obj0, start_frame, end_frame, dimension)
+        obj1_shapes = TrackManager.get_interpolated_shapes(obj1, start_frame, end_frame, dimension)
+        obj0_shapes_by_frame = {shape["frame"]:shape for shape in obj0_shapes}
+        obj1_shapes_by_frame = {shape["frame"]:shape for shape in obj1_shapes}
+        assert obj0_shapes_by_frame and obj1_shapes_by_frame
+
+        count, error = 0, 0
+        for frame in range(start_frame, end_frame):
+            shape0 = obj0_shapes_by_frame.get(frame)
+            shape1 = obj1_shapes_by_frame.get(frame)
+            if shape0 and shape1:
+                if shape0["outside"] != shape1["outside"]:
+                    error += 1
+                else:
+                    error += 1 - ShapeManager._calc_objects_similarity(shape0, shape1, start_frame, overlap, dimension)
+                count += 1
+            elif shape0 or shape1:
+                error += 1
+                count += 1
+
+        return 1 - error / count
 
     def _modify_unmached_object(self, obj, end_frame):
         shape = obj["shapes"][-1]
@@ -563,10 +559,9 @@ class TrackManager(ObjectManager):
         def points_interpolation(shape0, shape1):
             if len(shape0["points"]) == 2 and len(shape1["points"]) == 2:
                 return simple_interpolation(shape0, shape1)
-            else:
-                shapes = []
-                for frame in range(shape0["frame"] + 1, shape1["frame"]):
-                    shapes.append(copy_shape(shape0, frame))
+            shapes = []
+            for frame in range(shape0["frame"] + 1, shape1["frame"]):
+                shapes.append(copy_shape(shape0, frame))
 
             return shapes
 
@@ -717,11 +712,10 @@ class TrackManager(ObjectManager):
                         if previous_opened is not None:
                             if matching[i][0] == matching[previous_opened][0]:
                                 continue
-                            else:
-                                start = previous_opened
-                                stop = i - 1
-                                left_segment(start, stop)
-                                previous_opened = i
+                            start = previous_opened
+                            stop = i - 1
+                            left_segment(start, stop)
+                            previous_opened = i
                         else:
                             previous_opened = i
                     else:

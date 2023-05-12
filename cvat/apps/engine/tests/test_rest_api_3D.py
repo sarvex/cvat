@@ -72,31 +72,37 @@ class _DbTestBase(APITestCase):
 
     def _put_api_v2_task_id_annotations(self, tid, data):
         with ForceLogin(self.admin, self.client):
-            response = self.client.put("/api/tasks/%s/annotations" % tid,
-                                       data=data, format="json")
+            response = self.client.put(
+                f"/api/tasks/{tid}/annotations", data=data, format="json"
+            )
 
         return response
 
     def _put_api_v2_job_id_annotations(self, jid, data):
         with ForceLogin(self.admin, self.client):
-            response = self.client.put("/api/jobs/%s/annotations" % jid,
-                                       data=data, format="json")
+            response = self.client.put(
+                f"/api/jobs/{jid}/annotations", data=data, format="json"
+            )
 
         return response
 
     def _patch_api_v2_task_id_annotations(self, tid, data, action, user):
         with ForceLogin(user, self.client):
             response = self.client.patch(
-                "/api/tasks/{}/annotations?action={}".format(tid, action),
-                data=data, format="json")
+                f"/api/tasks/{tid}/annotations?action={action}",
+                data=data,
+                format="json",
+            )
 
         return response
 
     def _patch_api_v2_job_id_annotations(self, jid, data, action, user):
         with ForceLogin(user, self.client):
             response = self.client.patch(
-                "/api/jobs/{}/annotations?action={}".format(jid, action),
-                data=data, format="json")
+                f"/api/jobs/{jid}/annotations?action={action}",
+                data=data,
+                format="json",
+            )
 
         return response
 
@@ -106,16 +112,19 @@ class _DbTestBase(APITestCase):
             assert response.status_code == status.HTTP_201_CREATED, response.status_code
             tid = response.data["id"]
 
-            response = self.client.post("/api/tasks/%s/data" % tid,
-                data=image_data)
+            response = self.client.post(f"/api/tasks/{tid}/data", data=image_data)
             assert response.status_code == status.HTTP_202_ACCEPTED, response.status_code
 
-            response = self.client.get("/api/tasks/%s" % tid)
+            response = self.client.get(f"/api/tasks/{tid}")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get("/api/labels?task_id=%s&page=%s" % (tid, page))
-                ))
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f"/api/labels?task_id={tid}&page={page}"
+                        )
+                    )
+                )
                 response.data["labels"] = labels_response
 
             task = response.data
@@ -150,8 +159,10 @@ class _DbTestBase(APITestCase):
 
     def _get_jobs(self, task_id):
         with ForceLogin(self.admin, self.client):
-            values = get_paginated_collection(lambda page:
-                self.client.get("/api/jobs?task_id={}&page={}".format(task_id, page))
+            values = get_paginated_collection(
+                lambda page: self.client.get(
+                    f"/api/jobs?task_id={task_id}&page={page}"
+                )
             )
         return values
 
@@ -212,7 +223,7 @@ class _DbTestBase(APITestCase):
         return response
 
     def _delete_task(self, tid):
-        response = self._delete_request('/api/tasks/{}'.format(tid), self.admin)
+        response = self._delete_request(f'/api/tasks/{tid}', self.admin)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         return response
 
@@ -228,8 +239,7 @@ class _DbTestBase(APITestCase):
                 d = {t.tag: {k: v[0] if len(v) == 1 else v
                              for k, v in dd.items()}}
             if t.attrib:
-                d[t.tag].update(('@' + k, v)
-                                for k, v in t.attrib.items())
+                d[t.tag].update((f'@{k}', v) for k, v in t.attrib.items())
             if t.text:
                 text = t.text.strip()
                 if children or t.attrib:
@@ -238,6 +248,7 @@ class _DbTestBase(APITestCase):
                 else:
                     d[t.tag] = text
             return d
+
         if format_name == "Kitti Raw Format 1.0":
             with tempfile.TemporaryDirectory() as tmp_dir:
                 zipfile.ZipFile(content).extractall(tmp_dir)
@@ -391,11 +402,10 @@ class Task3DTest(_DbTestBase):
     def copy_pcd_file_and_get_task_data(self, test_dir):
         tmp_file = osp.join(test_dir, self.pointcloud_pcd_filename)
         copyfile(self.pointcloud_pcd_path, tmp_file)
-        task_data = {
+        return {
             "client_files[0]": open(tmp_file, 'rb'),
             "image_quality": 100,
         }
-        return task_data
 
     def test_api_v2_create_annotation_in_job(self):
         with TestDir() as test_dir:

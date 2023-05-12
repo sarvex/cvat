@@ -21,12 +21,10 @@ def find_version(project_dir=None):
     # https://www.python.org/dev/peps/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
     pep_regex = r"([1-9]\d*!)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)(0|[1-9]\d*))?(\.post(0|[1-9]\d*))?(\.dev(0|[1-9]\d*))?"
     version_regex = r"VERSION\s*=\s*.(" + pep_regex + ")."
-    match = re.match(version_regex, version_text)
-    if not match:
-        raise RuntimeError("Failed to find version string in '%s'" % file_path)
-
-    version = version_text[match.start(1) : match.end(1)]
-    return version
+    if match := re.match(version_regex, version_text):
+        return version_text[match.start(1) : match.end(1)]
+    else:
+        raise RuntimeError(f"Failed to find version string in '{file_path}'")
 
 
 BASE_REQUIREMENTS_FILE = "requirements/base.txt"

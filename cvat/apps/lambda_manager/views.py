@@ -48,10 +48,7 @@ class LambdaGateway:
 
     def _http(self, method="get", scheme=None, host=None, port=None,
         function_namespace=None, url=None, headers=None, data=None):
-        NUCLIO_GATEWAY = '{}://{}:{}'.format(
-            scheme or settings.NUCLIO['SCHEME'],
-            host or settings.NUCLIO['HOST'],
-            port or settings.NUCLIO['PORT'])
+        NUCLIO_GATEWAY = f"{scheme or settings.NUCLIO['SCHEME']}://{host or settings.NUCLIO['HOST']}:{port or settings.NUCLIO['PORT']}"
         NUCLIO_FUNCTION_NAMESPACE = function_namespace or settings.NUCLIO['FUNCTION_NAMESPACE']
         extra_headers = {
             'x-nuclio-project-name': 'cvat',
@@ -59,14 +56,10 @@ class LambdaGateway:
             'x-nuclio-invoke-via': 'domain-name',
         }
         if headers:
-            extra_headers.update(headers)
+            extra_headers |= headers
         NUCLIO_TIMEOUT = settings.NUCLIO['DEFAULT_TIMEOUT']
 
-        if url:
-            url = "{}{}".format(NUCLIO_GATEWAY, url)
-        else:
-            url = NUCLIO_GATEWAY
-
+        url = f"{NUCLIO_GATEWAY}{url}" if url else NUCLIO_GATEWAY
         with make_requests_session() as session:
             reply = session.request(method, url, headers=extra_headers,
                 timeout=NUCLIO_TIMEOUT, json=data)
@@ -77,13 +70,11 @@ class LambdaGateway:
 
     def list(self):
         data = self._http(url=self.NUCLIO_ROOT_URL)
-        response = [LambdaFunction(self, item) for item in data.values()]
-        return response
+        return [LambdaFunction(self, item) for item in data.values()]
 
     def get(self, func_id):
-        data = self._http(url=self.NUCLIO_ROOT_URL + '/' + func_id)
-        response = LambdaFunction(self, data)
-        return response
+        data = self._http(url=f'{self.NUCLIO_ROOT_URL}/{func_id}')
+        return LambdaFunction(self, data)
 
     def invoke(self, func, payload):
         if os.getenv('KUBERNETES_SERVICE_HOST'):
@@ -124,16 +115,20 @@ class LambdaFunction:
         labels = [item['name'] for item in spec]
         if len(labels) != len(set(labels)):
             raise ValidationError(
-                "`{}` lambda function has non-unique labels".format(self.id),
-                code=status.HTTP_404_NOT_FOUND)
+                f"`{self.id}` lambda function has non-unique labels",
+                code=status.HTTP_404_NOT_FOUND,
+            )
         self.labels = labels
         # mapping of labels and corresponding supported attributes
         self.func_attributes = {item['name']: item.get('attributes', []) for item in spec}
         for label, attributes in self.func_attributes.items():
-            if len([attr['name'] for attr in attributes]) != len(set([attr['name'] for attr in attributes])):
+            if len([attr['name'] for attr in attributes]) != len(
+                {attr['name'] for attr in attributes}
+            ):
                 raise ValidationError(
-                    "`{}` lambda function has non-unique attributes for label {}".format(self.id, label),
-                    code=status.HTTP_404_NOT_FOUND)
+                    f"`{self.id}` lambda function has non-unique attributes for label {label}",
+                    code=status.HTTP_404_NOT_FOUND,
+                )
         # state of the function
         self.state = data['status']['state']
         # description of the function
@@ -164,22 +159,18 @@ class LambdaFunction:
         }
 
         if self.kind is LambdaType.INTERACTOR:
-            response.update({
+            response |= {
                 'min_pos_points': self.min_pos_points,
                 'min_neg_points': self.min_neg_points,
                 'startswith_box': self.startswith_box,
                 'help_message': self.help_message,
-                'animated_gif': self.animated_gif
-            })
+                'animated_gif': self.animated_gif,
+            }
 
         if self.kind is LambdaType.TRACKER:
-            response.update({
-                'state': self.state
-            })
+            response['state'] = self.state
         if self.kind is LambdaType.DETECTOR:
-            response.update({
-                'attributes': self.func_attributes
-            })
+            response['attributes'] = self.func_attributes
 
         return response
 
@@ -194,7 +185,7 @@ class LambdaFunction:
             data = {k: v for k,v in data.items() if v is not None}
             threshold = data.get("threshold")
             if threshold:
-                payload.update({ "threshold": threshold })
+                payload["threshold"] = threshold
             quality = data.get("quality")
             mapping = data.get("mapping", {})
 
@@ -232,7 +223,7 @@ class LambdaFunction:
                 supported_attrs[func_label] = {}
 
                 if mapped_attributes:
-                    task_attr_names = [task_attr for task_attr in task_attributes[mapped_label]]
+                    task_attr_names = list(task_attributes[mapped_label])
                     for attr in func_attrs:
                         mapped_attr = mapped_attributes.get(attr["name"])
                         if mapped_attr in task_attr_names:
@@ -249,16 +240,20 @@ class LambdaFunction:
                         code=status.HTTP_400_BAD_REQUEST)
 
             if self.kind == LambdaType.DETECTOR:
-                payload.update({
-                    "image": self._get_image(db_task, data["frame"], quality)
-                })
+                payload["image"] = self._get_image(db_task, data["frame"], quality)
             elif self.kind == LambdaType.INTERACTOR:
-                payload.update({
-                    "image": self._get_image(db_task, data["frame"], quality),
-                    "pos_points": data["pos_points"][2:] if self.startswith_box else data["pos_points"],
-                    "neg_points": data["neg_points"],
-                    "obj_bbox": data["pos_points"][0:2] if self.startswith_box else None
-                })
+                payload.update(
+                    {
+                        "image": self._get_image(db_task, data["frame"], quality),
+                        "pos_points": data["pos_points"][2:]
+                        if self.startswith_box
+                        else data["pos_points"],
+                        "neg_points": data["neg_points"],
+                        "obj_bbox": data["pos_points"][:2]
+                        if self.startswith_box
+                        else None,
+                    }
+                )
             elif self.kind == LambdaType.REID:
                 payload.update({
                     "image0": self._get_image(db_task, data["frame0"], quality),
@@ -268,9 +263,7 @@ class LambdaFunction:
                 })
                 max_distance = data.get("max_distance")
                 if max_distance:
-                    payload.update({
-                        "max_distance": max_distance
-                    })
+                    payload["max_distance"] = max_distance
             elif self.kind == LambdaType.TRACKER:
                 payload.update({
                     "image": self._get_image(db_task, data["frame"], quality),
@@ -310,7 +303,7 @@ class LambdaFunction:
                     return db_attr_type in ["select", "radio", "text"] and value.isnumeric()
                 elif func_attr_type == "text":
                     return db_attr_type == "text" or \
-                           (db_attr_type in ["select", "radio"] and len(value.split(" ")) == 1)
+                               (db_attr_type in ["select", "radio"] and len(value.split(" ")) == 1)
                 elif func_attr_type == "select":
                     return db_attr_type in ["radio", "text"]
                 elif func_attr_type == "radio":
@@ -319,6 +312,7 @@ class LambdaFunction:
                     return value in ["true", "false"]
                 else:
                     return False
+
         if self.kind == LambdaType.DETECTOR:
             for item in response:
                 item_label = item['label']
@@ -358,9 +352,12 @@ class LambdaFunction:
             quality = FrameProvider.Quality.COMPRESSED
         else:
             raise ValidationError(
-                '`{}` lambda function was run '.format(self.id) +
-                'with wrong arguments (quality={})'.format(quality),
-                code=status.HTTP_400_BAD_REQUEST)
+                (
+                    f'`{self.id}` lambda function was run '
+                    + f'with wrong arguments (quality={quality})'
+                ),
+                code=status.HTTP_400_BAD_REQUEST,
+            )
 
         frame_provider = FrameProvider(db_task.data)
         image = frame_provider.get_frame(frame, quality=quality)
@@ -390,8 +387,9 @@ class LambdaQueue:
         # protection.
         if list(filter(lambda job: job.get_task() == task and not job.is_finished, jobs)):
             raise ValidationError(
-                "Only one running request is allowed for the same task #{}".format(task),
-                code=status.HTTP_409_CONFLICT)
+                f"Only one running request is allowed for the same task #{task}",
+                code=status.HTTP_409_CONFLICT,
+            )
 
         queue = self._get_queue()
         # LambdaJob(None) is a workaround for python-rq. It has multiple issues
@@ -419,8 +417,9 @@ class LambdaQueue:
         queue = self._get_queue()
         job = queue.fetch_job(pk)
         if job is None or not job.meta.get("lambda"):
-            raise ValidationError("{} lambda job is not found".format(pk),
-                code=status.HTTP_404_NOT_FOUND)
+            raise ValidationError(
+                f"{pk} lambda job is not found", code=status.HTTP_404_NOT_FOUND
+            )
 
         return LambdaJob(job)
 
@@ -770,9 +769,12 @@ class FunctionViewSet(viewsets.ViewSet):
             db_task = Task.objects.get(pk=task_id)
         except (KeyError, ObjectDoesNotExist) as err:
             raise ValidationError(
-                '`{}` lambda function was run '.format(func_id) +
-                'with wrong arguments ({})'.format(str(err)),
-                code=status.HTTP_400_BAD_REQUEST)
+                (
+                    f'`{func_id}` lambda function was run '
+                    + f'with wrong arguments ({str(err)})'
+                ),
+                code=status.HTTP_400_BAD_REQUEST,
+            )
 
         gateway = LambdaGateway()
         lambda_func = gateway.get(func_id)
@@ -820,9 +822,12 @@ class RequestViewSet(viewsets.ViewSet):
             max_distance = request.data.get('max_distance')
         except KeyError as err:
             raise ValidationError(
-                '`{}` lambda function was run '.format(request.data.get('function', 'undefined')) +
-                'with wrong arguments ({})'.format(str(err)),
-                code=status.HTTP_400_BAD_REQUEST)
+                (
+                    f"`{request.data.get('function', 'undefined')}` lambda function was run "
+                    + f'with wrong arguments ({str(err)})'
+                ),
+                code=status.HTTP_400_BAD_REQUEST,
+            )
 
         gateway = LambdaGateway()
         queue = LambdaQueue()

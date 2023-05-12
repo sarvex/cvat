@@ -98,7 +98,7 @@ class Processor:
             osp.relpath(self._sdk_reference_dir, self._content_dir), "apis/_index.md"
         )
         apis_index_path = osp.join(
-            self._templates_dir, apis_index_filename + ".template"
+            self._templates_dir, f"{apis_index_filename}.template"
         )
         with open(apis_index_path) as f:
             contents = f.read()
@@ -130,7 +130,7 @@ class Processor:
             osp.join(self._sdk_reference_dir, p) for p in mapping.values()
         ]
 
-        for p in iglob(self._sdk_reference_dir + "/**/*.md", recursive=True):
+        for p in iglob(f"{self._sdk_reference_dir}/**/*.md", recursive=True):
             with open(p) as f:
                 contents = f.read()
 
@@ -160,18 +160,17 @@ class Processor:
         while block_start_pos < len(text):
             pattern = re.compile(used_quotes or "```|`")
             next_code_block_quote = pattern.search(text, pos=block_start_pos)
-            if next_code_block_quote is not None:
-                if not used_quotes:
-                    inside_code_block = False
-                    block_end_pos = next_code_block_quote.start(0)
-                    used_quotes = next_code_block_quote.group(0)
-                else:
-                    inside_code_block = True
-                    block_end_pos = next_code_block_quote.end(0)
-                    used_quotes = None
-            else:
+            if next_code_block_quote is None:
                 block_end_pos = len(text)
 
+            elif not used_quotes:
+                inside_code_block = False
+                block_end_pos = next_code_block_quote.start(0)
+                used_quotes = next_code_block_quote[0]
+            else:
+                inside_code_block = True
+                block_end_pos = next_code_block_quote.end(0)
+                used_quotes = None
             if not inside_code_block:
                 block = text[block_start_pos:block_end_pos]
 
@@ -209,14 +208,12 @@ class Processor:
             r"(?:(?:\/\S+)*|\/)"
         )
 
-        text = re.sub(
+        return re.sub(
             r"(\A|[\.\s])(" + URL_REGEX + r")([\.\s]|\Z)",
             r"\1<\2>\3",
             text,
             flags=re.MULTILINE,
         )
-
-        return text
 
     def _fix_parsing_problems(self):
         """
@@ -225,7 +222,7 @@ class Processor:
         Adds escapes to freestanding square brackets to make parsing correct.
         """
 
-        for p in iglob(self._sdk_reference_dir + "/**/*.md", recursive=True):
+        for p in iglob(f"{self._sdk_reference_dir}/**/*.md", recursive=True):
             with open(p) as f:
                 contents = f.read()
 

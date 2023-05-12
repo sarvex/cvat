@@ -91,13 +91,13 @@ def create_db_task(data):
     db_task.data = db_data
     db_task.save()
 
-    if not labels is None:
+    if labels is not None:
         for label_data in labels:
             attributes = label_data.pop('attributes', None)
             db_label = Label(task=db_task, **label_data)
             db_label.save()
 
-            if not attributes is None:
+            if attributes is not None:
                 for attribute_data in attributes:
                     db_attribute = AttributeSpec(label=db_label, **attribute_data)
                     db_attribute.save()
@@ -125,13 +125,13 @@ def create_db_project(data):
     os.makedirs(db_project.get_dirname())
     os.makedirs(db_project.get_project_logs_dirname())
 
-    if not labels is None:
+    if labels is not None:
         for label_data in labels:
             attributes = label_data.pop('attributes', None)
             db_label = Label(project=db_project, **label_data)
             db_label.save()
 
-            if not attributes is None:
+            if attributes is not None:
                 for attribute_data in attributes:
                     db_attribute = AttributeSpec(label=db_label, **attribute_data)
                     db_attribute.save()
@@ -139,8 +139,6 @@ def create_db_project(data):
     return db_project
 
 def create_dummy_db_tasks(obj, project=None):
-    tasks = []
-
     data = {
         "name": "my task #1",
         "owner": obj.owner,
@@ -152,8 +150,7 @@ def create_dummy_db_tasks(obj, project=None):
         "project": project
     }
     db_task = create_db_task(data)
-    tasks.append(db_task)
-
+    tasks = [db_task]
     data = {
         "name": "my multijob task",
         "owner": obj.user,
@@ -194,16 +191,13 @@ def create_dummy_db_tasks(obj, project=None):
     return tasks
 
 def create_dummy_db_projects(obj):
-    projects = []
-
     data = {
         "name": "my empty project",
         "owner": obj.owner,
         "assignee": obj.assignee,
     }
     db_project = create_db_project(data)
-    projects.append(db_project)
-
+    projects = [db_project]
     data = {
         "name": "my project without assignee",
         "owner": obj.user,
@@ -269,7 +263,7 @@ class JobGetAPITestCase(APITestCase):
 
     def _run_api_v2_jobs_id(self, jid, user):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/jobs/{}'.format(jid))
+            response = self.client.get(f'/api/jobs/{jid}')
 
         return response
 
@@ -331,7 +325,7 @@ class JobPartialUpdateAPITestCase(APITestCase):
 
     def _run_api_v2_jobs_id(self, jid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/jobs/{}'.format(jid), data=data, format='json')
+            response = self.client.patch(f'/api/jobs/{jid}', data=data, format='json')
 
         return response
 
@@ -410,7 +404,7 @@ class JobUpdateAPITestCase(APITestCase):
 
     def _run_api_v2_jobs_id(self, jid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.put('/api/jobs/{}'.format(jid), data=data, format='json')
+            response = self.client.put(f'/api/jobs/{jid}', data=data, format='json')
 
         return response
 
@@ -438,7 +432,9 @@ class JobDataMetaPartialUpdateAPITestCase(APITestCase):
 
     def _run_api_v1_jobs_data_meta_id(self, jid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/jobs/{}/data/meta'.format(jid), data=data, format='json')
+            response = self.client.patch(
+                f'/api/jobs/{jid}/data/meta', data=data, format='json'
+            )
 
         return response
 
@@ -705,7 +701,7 @@ class UserSelfAPITestCase(UserAPITestCase):
 class UserGetAPITestCase(UserAPITestCase):
     def _run_api_v2_users_id(self, user, user_id):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/users/{}'.format(user_id))
+            response = self.client.get(f'/api/users/{user_id}')
 
         return response
 
@@ -747,7 +743,7 @@ class UserGetAPITestCase(UserAPITestCase):
 class UserPartialUpdateAPITestCase(UserAPITestCase):
     def _run_api_v2_users_id(self, user, user_id, data):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/users/{}'.format(user_id), data=data, format='json')
+            response = self.client.patch(f'/api/users/{user_id}', data=data, format='json')
 
         return response
 
@@ -793,7 +789,7 @@ class UserPartialUpdateAPITestCase(UserAPITestCase):
 class UserDeleteAPITestCase(UserAPITestCase):
     def _run_api_v2_users_id(self, user, user_id):
         with ForceLogin(user, self.client):
-            response = self.client.delete('/api/users/{}'.format(user_id))
+            response = self.client.delete(f'/api/users/{user_id}')
 
         return response
 
@@ -840,7 +836,7 @@ class ProjectListAPITestCase(APITestCase):
 
     def _run_api_v2_projects(self, user, params=""):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/projects{}'.format(params))
+            response = self.client.get(f'/api/projects{params}')
 
         return response
 
@@ -880,7 +876,7 @@ class ProjectGetAPITestCase(APITestCase):
 
     def _run_api_v2_projects_id(self, pid, user):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/projects/{}'.format(pid))
+            response = self.client.get(f'/api/projects/{pid}')
 
         return response
 
@@ -929,7 +925,7 @@ class ProjectDeleteAPITestCase(APITestCase):
 
     def _run_api_v2_projects_id(self, pid, user):
         with ForceLogin(user, self.client):
-            response = self.client.delete('/api/projects/{}'.format(pid), format="json")
+            response = self.client.delete(f'/api/projects/{pid}', format="json")
 
         return response
 
@@ -991,11 +987,13 @@ class ProjectCreateAPITestCase(APITestCase):
             response = self.client.post('/api/projects', data=data, format="json")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get(
-                        "/api/labels?project_id=%s&page=%s" % (response.data["id"], page)
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f'/api/labels?project_id={response.data["id"]}&page={page}'
+                        )
                     )
-                ))
+                )
                 response.data["labels"] = labels_response
 
         return response
@@ -1090,13 +1088,16 @@ class ProjectPartialUpdateAPITestCase(APITestCase):
 
     def _run_api_v2_projects_id(self, pid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/projects/{}'.format(pid),
-                data=data, format="json")
+            response = self.client.patch(f'/api/projects/{pid}', data=data, format="json")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get("/api/labels?project_id=%s&page=%s" % (pid, page))
-                ))
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f"/api/labels?project_id={pid}&page={page}"
+                        )
+                    )
+                )
                 response.data["labels"] = labels_response
 
         return response
@@ -1185,18 +1186,17 @@ class UpdateLabelsAPITestCase(APITestCase):
                 )
                 db_labels = [l for l in db_labels if label.get("name") != l.name]
                 response_labels = [l for l in response_labels if label.get("name") != l.get("name")]
+            elif label.get("deleted", False):
+                self.assertEqual(
+                    len([l for l in response_labels if label.get("id") == l.get("id")]), 0
+                )
             else:
-                if not label.get("deleted", False):
-                    self.assertLabelsEqual(
-                        label,
-                        [l for l in response_labels if label.get("id") == l.get("id")][0],
-                    )
-                    response_labels = [l for l in response_labels if label.get("id") != l.get("id")]
-                    db_labels = [l for l in db_labels if label.get("id") != l.id]
-                else:
-                    self.assertEqual(
-                        len([l for l in response_labels if label.get("id") == l.get("id")]), 0
-                    )
+                self.assertLabelsEqual(
+                    label,
+                    [l for l in response_labels if label.get("id") == l.get("id")][0],
+                )
+                response_labels = [l for l in response_labels if label.get("id") != l.get("id")]
+                db_labels = [l for l in db_labels if label.get("id") != l.id]
             self.assertEqual(len(response_labels), len(db_labels))
 
 class ProjectUpdateLabelsAPITestCase(UpdateLabelsAPITestCase):
@@ -1230,13 +1230,16 @@ class ProjectUpdateLabelsAPITestCase(UpdateLabelsAPITestCase):
 
     def _run_api_v2_project_id(self, pid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/projects/{}'.format(pid),
-                data=data, format="json")
+            response = self.client.patch(f'/api/projects/{pid}', data=data, format="json")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get("/api/labels?project_id=%s&page=%s" % (pid, page))
-                ))
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f"/api/labels?project_id={pid}&page={page}"
+                        )
+                    )
+                )
                 response.data["labels"] = labels_response
 
         return response
@@ -1280,7 +1283,7 @@ class ProjectListOfTasksAPITestCase(APITestCase):
 
     def _run_api_v2_projects_id_tasks(self, user, pid):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/tasks?project_id={}'.format(pid))
+            response = self.client.get(f'/api/tasks?project_id={pid}')
 
         return response
 
@@ -1605,7 +1608,9 @@ class ProjectBackupAPITestCase(APITestCase):
 
     def _run_api_v2_projects_id_export(self, pid, user, query_params=""):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/projects/{}/backup?{}'.format(pid, query_params), format="json")
+            response = self.client.get(
+                f'/api/projects/{pid}/backup?{query_params}', format="json"
+            )
 
         return response
 
@@ -1617,7 +1622,7 @@ class ProjectBackupAPITestCase(APITestCase):
 
     def _run_api_v2_projects_id(self, pid, user):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/projects/{}'.format(pid), format="json")
+            response = self.client.get(f'/api/projects/{pid}', format="json")
 
         return response.data
 
@@ -1657,28 +1662,28 @@ class ProjectBackupAPITestCase(APITestCase):
                 }
                 response = self._run_api_v2_projects_import(user, uploaded_data)
                 self.assertEqual(response.status_code, HTTP_202_ACCEPTED)
-                if response.status_code == status.HTTP_200_OK:
-                    rq_id = response.data["rq_id"]
-                    response = self._run_api_v2_projects_import(user, {"rq_id": rq_id})
-                    self.assertEqual(response.status_code, HTTP_201_CREATED)
-                    original_project = self._run_api_v2_projects_id(pid, user)
-                    imported_project = self._run_api_v2_projects_id(response.data["id"], user)
-                    compare_objects(
-                        self=self,
-                        obj1=original_project,
-                        obj2=imported_project,
-                        ignore_keys=(
-                            "data",
-                            "id",
-                            "url",
-                            "owner",
-                            "assignee",
-                            "created_date",
-                            "updated_date",
-                            "project_id",
-                            "tasks",
-                        ),
-                    )
+            if response.status_code == status.HTTP_200_OK:
+                rq_id = response.data["rq_id"]
+                response = self._run_api_v2_projects_import(user, {"rq_id": rq_id})
+                self.assertEqual(response.status_code, HTTP_201_CREATED)
+                original_project = self._run_api_v2_projects_id(pid, user)
+                imported_project = self._run_api_v2_projects_id(response.data["id"], user)
+                compare_objects(
+                    self=self,
+                    obj1=original_project,
+                    obj2=imported_project,
+                    ignore_keys=(
+                        "data",
+                        "id",
+                        "url",
+                        "owner",
+                        "assignee",
+                        "created_date",
+                        "updated_date",
+                        "project_id",
+                        "tasks",
+                    ),
+                )
 
     def test_api_v2_projects_id_export_admin(self):
         self._run_api_v2_projects_id_export_import(self.admin)
@@ -1714,13 +1719,14 @@ class ProjectExportAPITestCase(APITestCase):
     def _run_api_v2_project_id_export(self, pid, user, annotation_format=""):
         with ForceLogin(user, self.client):
             response = self.client.get(
-                '/api/projects/{}/annotations?format={}'.format(pid, annotation_format),
-                format="json")
+                f'/api/projects/{pid}/annotations?format={annotation_format}',
+                format="json",
+            )
         return response
 
     def _run_api_v2_tasks_id_delete(self, tid, user):
         with ForceLogin(user, self.client):
-            response = self.client.delete('/api/tasks/{}'.format(tid), format="json")
+            response = self.client.delete(f'/api/tasks/{tid}', format="json")
         return response
 
     def _check_tasks_count(self, project, expected_result):
@@ -1872,17 +1878,25 @@ class ProjectImportExportAPITestCase(APITestCase):
 
     def _run_api_v2_projects_id_dataset_export(self, pid, user, query_params=""):
         with ForceLogin(user, self.client):
-            response = self.client.get("/api/projects/{}/dataset?{}".format(pid, query_params), format="json")
+            response = self.client.get(
+                f"/api/projects/{pid}/dataset?{query_params}", format="json"
+            )
         return response
 
     def _run_api_v2_projects_id_dataset_import(self, pid, user, data, f):
         with ForceLogin(user, self.client):
-            response = self.client.post("/api/projects/{}/dataset?format={}".format(pid, f),  data=data, format="multipart")
+            response = self.client.post(
+                f"/api/projects/{pid}/dataset?format={f}",
+                data=data,
+                format="multipart",
+            )
         return response
 
     def _run_api_v2_projects_id_dataset_import_status(self, pid, user):
         with ForceLogin(user, self.client):
-            response = self.client.get("/api/projects/{}/dataset?action=import_status".format(pid), format="json")
+            response = self.client.get(
+                f"/api/projects/{pid}/dataset?action=import_status", format="json"
+            )
         return response
 
     def test_api_v2_projects_id_export_import(self):
@@ -1932,7 +1946,7 @@ class TaskListAPITestCase(APITestCase):
 
     def _run_api_v2_tasks(self, user, params=""):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/tasks{}'.format(params))
+            response = self.client.get(f'/api/tasks{params}')
 
         return response
 
@@ -1972,14 +1986,16 @@ class TaskGetAPITestCase(APITestCase):
 
     def _run_api_v2_tasks_id(self, tid, user):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/tasks/{}'.format(tid))
+            response = self.client.get(f'/api/tasks/{tid}')
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get(
-                        "/api/labels?task_id=%s&page=%s" % (tid, page)
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f"/api/labels?task_id={tid}&page={page}"
+                        )
                     )
-                ))
+                )
                 response.data["labels"] = labels_response
 
         return response
@@ -2038,7 +2054,7 @@ class TaskDeleteAPITestCase(APITestCase):
 
     def _run_api_v2_tasks_id(self, tid, user):
         with ForceLogin(user, self.client):
-            response = self.client.delete('/api/tasks/{}'.format(tid), format="json")
+            response = self.client.delete(f'/api/tasks/{tid}', format="json")
 
         return response
 
@@ -2085,8 +2101,7 @@ class TaskUpdateAPITestCase(APITestCase):
 
     def _run_api_v2_tasks_id(self, tid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.put('/api/tasks/{}'.format(tid),
-                data=data, format="json")
+            response = self.client.put(f'/api/tasks/{tid}', data=data, format="json")
 
         return response
 
@@ -2156,13 +2171,16 @@ class TaskPartialUpdateAPITestCase(APITestCase):
 
     def _run_api_v2_tasks_id(self, tid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/tasks/{}'.format(tid),
-                data=data, format="json")
+            response = self.client.patch(f'/api/tasks/{tid}', data=data, format="json")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get("/api/labels?task_id=%s&page=%s" % (tid, page))
-                ))
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f"/api/labels?task_id={tid}&page={page}"
+                        )
+                    )
+                )
                 response.data["labels"] = labels_response
 
         return response
@@ -2274,8 +2292,9 @@ class TaskDataMetaPartialUpdateAPITestCase(APITestCase):
 
     def _run_api_v1_task_data_meta_id(self, tid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/tasks/{}/data/meta'.format(tid),
-                data=data, format="json")
+            response = self.client.patch(
+                f'/api/tasks/{tid}/data/meta', data=data, format="json"
+            )
 
         return response
 
@@ -2339,13 +2358,16 @@ class TaskUpdateLabelsAPITestCase(UpdateLabelsAPITestCase):
 
     def _run_api_v2_task_id(self, tid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.patch('/api/tasks/{}'.format(tid),
-                data=data, format="json")
+            response = self.client.patch(f'/api/tasks/{tid}', data=data, format="json")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get("/api/labels?task_id=%s&page=%s" % (tid, page))
-                ))
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f"/api/labels?task_id={tid}&page={page}"
+                        )
+                    )
+                )
                 response.data["labels"] = labels_response
 
         return response
@@ -2389,8 +2411,6 @@ class TaskMoveAPITestCase(APITestCase):
     def setUpTestData(cls):
         create_db_users(cls)
 
-        projects = []
-
         project_data = {
             "name": "Project for task move 1",
             "owner": cls.admin,
@@ -2408,8 +2428,7 @@ class TaskMoveAPITestCase(APITestCase):
             }]
         }
         db_project = create_db_project(project_data)
-        projects.append(db_project)
-
+        projects = [db_project]
         project_data = {
             "name": "Project for task move 2",
             "owner": cls.admin,
@@ -2520,15 +2539,17 @@ class TaskMoveAPITestCase(APITestCase):
 
     def _run_api_v2_tasks_id(self, tid, data):
         with ForceLogin(self.admin, self.client):
-            response = self.client.patch('/api/tasks/{}'.format(tid),
-                data=data, format="json")
+            response = self.client.patch(f'/api/tasks/{tid}', data=data, format="json")
 
         return response
 
     def _run_api_v2_job_id_annotation(self, jid, data):
         with ForceLogin(self.admin, self.client):
-            response = self.client.patch('/api/jobs/{}/annotations?action=create'.format(jid),
-                data=data, format="json")
+            response = self.client.patch(
+                f'/api/jobs/{jid}/annotations?action=create',
+                data=data,
+                format="json",
+            )
 
         return response
 
@@ -2592,11 +2613,13 @@ class TaskCreateAPITestCase(APITestCase):
             response = self.client.post('/api/tasks', data=data, format="json")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get(
-                        "/api/labels?task_id=%s&page=%s" % (response.data["id"], page)
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f'/api/labels?task_id={response.data["id"]}&page={page}'
+                        )
                     )
-                ))
+                )
                 response.data["labels"] = labels_response
 
         return response
@@ -2992,7 +3015,9 @@ class TaskImportExportAPITestCase(APITestCase):
 
     def _run_api_v2_tasks_id_export(self, tid, user, query_params=""):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/tasks/{}/backup?{}'.format(tid, query_params), format="json")
+            response = self.client.get(
+                f'/api/tasks/{tid}/backup?{query_params}', format="json"
+            )
 
         return response
 
@@ -3004,7 +3029,7 @@ class TaskImportExportAPITestCase(APITestCase):
 
     def _run_api_v2_tasks_id(self, tid, user):
         with ForceLogin(user, self.client):
-            response = self.client.get('/api/tasks/{}'.format(tid), format="json")
+            response = self.client.get(f'/api/tasks/{tid}', format="json")
 
         return response.data
 
@@ -3402,8 +3427,7 @@ class TaskDataAPITestCase(APITestCase):
 
     def _run_api_v2_tasks_id_data_post(self, tid, user, data):
         with ForceLogin(user, self.client):
-            response = self.client.post('/api/tasks/{}/data'.format(tid),
-                data=data)
+            response = self.client.post(f'/api/tasks/{tid}/data', data=data)
 
         return response
 
@@ -3414,19 +3438,19 @@ class TaskDataAPITestCase(APITestCase):
 
     def _get_task(self, user, tid):
         with ForceLogin(user, self.client):
-            return self.client.get("/api/tasks/{}".format(tid))
+            return self.client.get(f"/api/tasks/{tid}")
 
     def _run_api_v2_task_id_data_get(self, tid, user, data_type, data_quality=None, data_number=None):
-        url = '/api/tasks/{}/data?type={}'.format(tid, data_type)
+        url = f'/api/tasks/{tid}/data?type={data_type}'
         if data_quality is not None:
-            url += '&quality={}'.format(data_quality)
+            url += f'&quality={data_quality}'
         if data_number is not None:
-            url += '&number={}'.format(data_number)
+            url += f'&number={data_number}'
         with ForceLogin(user, self.client):
             return self.client.get(url)
 
     def _get_preview(self, tid, user):
-        url = '/api/tasks/{}/preview'.format(tid)
+        url = f'/api/tasks/{tid}/preview'
         with ForceLogin(user, self.client):
             return self.client.get(url)
 

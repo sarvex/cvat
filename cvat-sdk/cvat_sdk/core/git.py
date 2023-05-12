@@ -42,7 +42,7 @@ def create_git_repo(
         response = client.api_client.rest_client.GET(check_url, headers=common_headers)
         response_json = json.loads(response.data)
         status = response_json["status"]
-        if status == "failed" or status == "unknown":
+        if status in ["failed", "unknown"]:
             client.logger.error(
                 "Dataset repository creation request for task %s failed" "with status %s.",
                 task_id,

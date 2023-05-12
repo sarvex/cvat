@@ -176,9 +176,7 @@ class ModelUpdateMixin(ABC, Generic[IModel]):
 
         if isinstance(overrides, ModelNormal):
             overrides = to_json(overrides)
-        fields = deepcopy(overrides)
-
-        return fields
+        return deepcopy(overrides)
 
     def fetch(self: Entity) -> Self:
         """

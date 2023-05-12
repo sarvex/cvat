@@ -152,29 +152,29 @@ def get_data(scope, context, ownership, privilege, membership, resource, same_or
         if same_org:
             data["resource"]["organization"]["id"] = org_id
 
-    if ownership == "owner":
-        data["resource"]["owner"]["id"] = user_id
-
-    if ownership == "project:owner":
-        data["resource"]["project"]["owner"]["id"] = user_id
-
-    if ownership == "project:assignee":
-        data["resource"]["project"]["assignee"]["id"] = user_id
-
-    if ownership == "task:owner":
-        data["resource"]["task"]["owner"]["id"] = user_id
-
-    if ownership == "task:assignee":
-        data["resource"]["task"]["assignee"]["id"] = user_id
-
-    if ownership == "job:assignee":
-        data["resource"]["job"]["assignee"]["id"] = user_id
-
-    if ownership == "issue:owner":
-        data["resource"]["issue"]["owner"]["id"] = user_id
-
     if ownership == "issue:assignee":
         data["resource"]["issue"]["assignee"]["id"] = user_id
+
+    elif ownership == "issue:owner":
+        data["resource"]["issue"]["owner"]["id"] = user_id
+
+    elif ownership == "job:assignee":
+        data["resource"]["job"]["assignee"]["id"] = user_id
+
+    elif ownership == "owner":
+        data["resource"]["owner"]["id"] = user_id
+
+    elif ownership == "project:assignee":
+        data["resource"]["project"]["assignee"]["id"] = user_id
+
+    elif ownership == "project:owner":
+        data["resource"]["project"]["owner"]["id"] = user_id
+
+    elif ownership == "task:assignee":
+        data["resource"]["task"]["assignee"]["id"] = user_id
+
+    elif ownership == "task:owner":
+        data["resource"]["task"]["owner"]["id"] = user_id
 
     return data
 
@@ -184,7 +184,7 @@ def _get_name(prefix, **kwargs):
     for k, v in kwargs.items():
         if k == "resource":
             continue
-        prefix = "_" + str(k)
+        prefix = f"_{str(k)}"
         if isinstance(v, dict):
             if "id" in v:
                 v = v.copy()
@@ -215,10 +215,7 @@ def is_valid(scope, context, ownership, privilege, membership, resource, same_or
         return False
     if not has_proj and ownership.startswith("project"):
         return False
-    if scope == "create@issue" and ownership == "owner":
-        return False
-
-    return True
+    return scope != "create@issue" or ownership != "owner"
 
 
 def gen_test_rego(name):

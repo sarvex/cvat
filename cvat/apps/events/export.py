@@ -132,9 +132,7 @@ def export(request, filter_query, queue_name):
     }
 
     queue = django_rq.get_queue(queue_name)
-    rq_job = queue.fetch_job(rq_id)
-
-    if rq_job:
+    if rq_job := queue.fetch_job(rq_id):
         if rq_job.is_finished:
             file_path = rq_job.return_value
             if action == "download" and os.path.exists(file_path):

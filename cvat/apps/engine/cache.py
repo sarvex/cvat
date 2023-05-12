@@ -43,36 +43,34 @@ class MediaCache:
         return item
 
     def get_buf_chunk_with_mime(self, chunk_number, quality, db_data):
-        item = self._get_or_set_cache_item(
+        return self._get_or_set_cache_item(
             key=f'{db_data.id}_{chunk_number}_{quality}',
-            create_function=lambda: self._prepare_chunk_buff(db_data, quality, chunk_number),
+            create_function=lambda: self._prepare_chunk_buff(
+                db_data, quality, chunk_number
+            ),
         )
-
-        return item
 
     def get_local_preview_with_mime(self, frame_number, db_data):
-        item = self._get_or_set_cache_item(
+        return self._get_or_set_cache_item(
             key=f'data_{db_data.id}_{frame_number}_preview',
-            create_function=lambda: self._prepare_local_preview(frame_number, db_data),
+            create_function=lambda: self._prepare_local_preview(
+                frame_number, db_data
+            ),
         )
-
-        return item
 
     def get_cloud_preview_with_mime(self, db_storage):
-        item = self._get_or_set_cache_item(
+        return self._get_or_set_cache_item(
             key=f'cloudstorage_{db_storage.id}_preview',
-            create_function=lambda: self._prepare_cloud_preview(db_storage)
+            create_function=lambda: self._prepare_cloud_preview(db_storage),
         )
-
-        return item
 
     def get_frame_context_images(self, db_data, frame_number):
-        item = self._get_or_set_cache_item(
+        return self._get_or_set_cache_item(
             key=f'context_image_{db_data.id}_{frame_number}',
-            create_function=lambda: self._prepare_context_image(db_data, frame_number)
+            create_function=lambda: self._prepare_context_image(
+                db_data, frame_number
+            ),
         )
-
-        return item
 
     @staticmethod
     def _get_frame_provider():
@@ -109,8 +107,7 @@ class MediaCache:
                 source_path=source_path, chunk_number=chunk_number,
                 chunk_size=db_data.chunk_size, start=db_data.start_frame,
                 stop=db_data.stop_frame, step=db_data.get_frame_step())
-            for frame in reader:
-                images.append((frame, source_path, None))
+            images.extend((frame, source_path, None) for frame in reader)
         else:
             reader = ImageDatasetManifestReader(manifest_path=db_data.get_manifest_path(),
                 chunk_number=chunk_number, chunk_size=db_data.chunk_size,
@@ -139,9 +136,13 @@ class MediaCache:
                         temp_file.flush()
                         checksum = item.get('checksum', None)
                         if not checksum:
-                            slogger.cloud_storage[db_cloud_storage.id].warning('A manifest file does not contain checksum for image {}'.format(item.get('name')))
-                        if checksum and not md5_hash(source_path) == checksum:
-                            slogger.cloud_storage[db_cloud_storage.id].warning('Hash sums of files {} do not match'.format(file_name))
+                            slogger.cloud_storage[db_cloud_storage.id].warning(
+                                f"A manifest file does not contain checksum for image {item.get('name')}"
+                            )
+                        if checksum and md5_hash(source_path) != checksum:
+                            slogger.cloud_storage[db_cloud_storage.id].warning(
+                                f'Hash sums of files {file_name} do not match'
+                            )
                         images.append((source_path, source_path, None))
             else:
                 for item in reader:
@@ -171,7 +172,7 @@ class MediaCache:
             manifest_prefix = os.path.dirname(manifest_model.filename)
             full_manifest_path = os.path.join(db_storage.get_storage_dirname(), manifest_model.filename)
             if not os.path.exists(full_manifest_path) or \
-                    datetime.utcfromtimestamp(os.path.getmtime(full_manifest_path)).replace(tzinfo=pytz.UTC) < storage.get_file_last_modified(manifest_model.filename):
+                        datetime.utcfromtimestamp(os.path.getmtime(full_manifest_path)).replace(tzinfo=pytz.UTC) < storage.get_file_last_modified(manifest_model.filename):
                 storage.download_file(manifest_model.filename, full_manifest_path)
             manifest = ImageManifestManager(
                 os.path.join(db_storage.get_storage_dirname(), manifest_model.filename),
@@ -186,7 +187,7 @@ class MediaCache:
             preview_path = os.path.join(manifest_prefix, preview_filename)
             break
         if not preview_path:
-            msg = 'Cloud storage {} does not contain any images'.format(db_storage.pk)
+            msg = f'Cloud storage {db_storage.pk} does not contain any images'
             slogger.cloud_storage[db_storage.pk].info(msg)
             raise NotFound(msg)
 

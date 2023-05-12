@@ -91,7 +91,7 @@ class _MyTusUploader(_TusUploader):
         resp = self._api_client.rest_client.POST(self.client.url, headers=headers)
         url = resp.headers.get("location")
         if url is None:
-            msg = "Attempt to retrieve create file url with status {}".format(resp.status_code)
+            msg = f"Attempt to retrieve create file url with status {resp.status_code}"
             raise tus_uploader.TusCommunicationError(msg, resp.status_code, resp.content)
         return tus_uploader.urljoin(self.client.url, url)
 
@@ -208,9 +208,8 @@ class Uploader:
     @staticmethod
     def _make_tus_uploader(api_client: ApiClient, url: str, **kwargs):
         # Add headers required by CVAT server
-        headers = {}
-        headers["Origin"] = api_client.configuration.host
-        headers.update(api_client.get_common_headers())
+        headers = {"Origin": api_client.configuration.host}
+        headers |= api_client.get_common_headers()
 
         client = _TusClient(url, headers=headers)
 
@@ -338,12 +337,13 @@ class DataUploader(Uploader):
         self._tus_start_upload(url)
 
         for group, group_size in bulk_file_groups:
-            files = {}
-            for i, filename in enumerate(group):
-                files[f"client_files[{i}]"] = (
+            files = {
+                f"client_files[{i}]": (
                     os.fspath(filename),
                     filename.read_bytes(),
                 )
+                for i, filename in enumerate(group)
+            }
             response = self._client.api_client.rest_client.POST(
                 url,
                 post_params={"image_quality": kwargs["image_quality"], **files},

@@ -22,9 +22,8 @@ def get_version(version):
 
     sub = ''
     if version[3] == 'alpha' and version[4] == 0:
-        git_changeset = get_git_changeset()
-        if git_changeset:
-            sub = '.dev%s' % git_changeset
+        if git_changeset := get_git_changeset():
+            sub = f'.dev{git_changeset}'
 
     elif version[3] != 'final':
         mapping = {'alpha': 'a', 'beta': 'b', 'rc': 'rc'}

@@ -23,11 +23,7 @@ def convert_mask_to_polygon(mask):
     if contours.size < 3 * 2:
         raise Exception('Less then three point have been detected. Can not build a polygon.')
 
-    polygon = []
-    for point in contours:
-        polygon.append([int(point[0]), int(point[1])])
-
-    return polygon
+    return [[int(point[0]), int(point[1])] for point in contours]
 
 class ModelHandler:
     def __init__(self):

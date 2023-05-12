@@ -194,7 +194,7 @@ class OrganizationPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/organizations/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/organizations/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -256,7 +256,7 @@ class InvitationPermission(OpenPolicyAgentPermission):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.role = kwargs.get('role')
-        self.url = settings.IAM_OPA_DATA_URL + '/invitations/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/invitations/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -319,7 +319,7 @@ class MembershipPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/memberships/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/memberships/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -369,7 +369,7 @@ class ServerPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/server/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/server/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -401,7 +401,7 @@ class EventsPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/events/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/events/allow'
 
     def filter(self, query_params):
         url = self.url.replace('/allow', '/filter')
@@ -445,7 +445,7 @@ class LogViewerPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/analytics/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/analytics/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -478,7 +478,7 @@ class UserPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/users/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/users/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -498,7 +498,6 @@ class UserPermission(OpenPolicyAgentPermission):
 
     def get_resource(self):
         data = None
-        organization = self.payload['input']['auth']['organization']
         if self.obj:
             data = {
                 'id': self.obj.id
@@ -509,6 +508,7 @@ class UserPermission(OpenPolicyAgentPermission):
             }
 
         if data:
+            organization = self.payload['input']['auth']['organization']
             data.update({
                 'membership': {
                     'role': organization['user']['role']
@@ -528,7 +528,7 @@ class LambdaPermission(OpenPolicyAgentPermission):
     @classmethod
     def create(cls, request, view, obj):
         permissions = []
-        if view.basename == 'function' or view.basename == 'request':
+        if view.basename in ['function', 'request']:
             scopes = cls.get_scopes(request, view, obj)
             for scope in scopes:
                 self = cls.create_base_perm(request, view, scope, obj)
@@ -545,7 +545,7 @@ class LambdaPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/lambda/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/lambda/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -593,7 +593,7 @@ class CloudStoragePermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/cloudstorages/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/cloudstorages/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -661,8 +661,7 @@ class ProjectPermission(OpenPolicyAgentPermission):
                 perm = TaskPermission.create_scope_list(request)
                 permissions.append(perm)
 
-            owner = request.data.get('owner_id') or request.data.get('owner')
-            if owner:
+            if owner := request.data.get('owner_id') or request.data.get('owner'):
                 perm = UserPermission.create_scope_view(request, owner)
                 permissions.append(perm)
 
@@ -687,7 +686,7 @@ class ProjectPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/projects/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/projects/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -876,7 +875,7 @@ class TaskPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/tasks/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/tasks/allow'
 
     @staticmethod
     def get_scopes(request, view, obj) -> List[Scopes]:
@@ -913,8 +912,9 @@ class TaskPermission(OpenPolicyAgentPermission):
 
         scopes = []
         if scope == Scopes.CREATE:
-            project_id = request.data.get('project_id') or request.data.get('project')
-            if project_id:
+            if project_id := request.data.get('project_id') or request.data.get(
+                'project'
+            ):
                 scope = Scopes.CREATE_IN_PROJECT
 
             scopes.append(scope)
@@ -955,11 +955,6 @@ class TaskPermission(OpenPolicyAgentPermission):
 
         elif scope is not None:
             scopes.append(scope)
-
-        else:
-            # TODO: think if we can protect from missing endpoints
-            # assert False, "Unknown scope"
-            pass
 
         return scopes
 
@@ -1042,8 +1037,7 @@ class WebhookPermission(OpenPolicyAgentPermission):
                     project_id=project_id)
                 permissions.append(self)
 
-            owner = request.data.get('owner_id') or request.data.get('owner')
-            if owner:
+            if owner := request.data.get('owner_id') or request.data.get('owner'):
                 perm = UserPermission.create_scope_view(request, owner)
                 permissions.append(perm)
 
@@ -1055,7 +1049,7 @@ class WebhookPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/webhooks/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/webhooks/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -1073,7 +1067,7 @@ class WebhookPermission(OpenPolicyAgentPermission):
         if scope == Scopes.CREATE:
             webhook_type = request.data.get('type')
             if webhook_type in [m.value for m in WebhookTypeChoice]:
-                scope = Scopes(str(scope) + f'@{webhook_type}')
+                scope = Scopes(f'{str(scope)}@{webhook_type}')
             scopes.append(scope)
         elif scope in [Scopes.UPDATE, Scopes.DELETE, Scopes.LIST, Scopes.VIEW]:
             scopes.append(scope)
@@ -1160,8 +1154,7 @@ class JobPermission(OpenPolicyAgentPermission):
                 perm = IssuePermission.create_scope_list(request)
                 permissions.append(perm)
 
-            assignee_id = request.data.get('assignee')
-            if assignee_id:
+            if assignee_id := request.data.get('assignee'):
                 perm = UserPermission.create_scope_view(request, assignee_id)
                 permissions.append(perm)
 
@@ -1186,7 +1179,7 @@ class JobPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/jobs/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/jobs/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -1297,7 +1290,7 @@ class CommentPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/comments/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/comments/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -1388,7 +1381,7 @@ class IssuePermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/issues/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/issues/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -1463,10 +1456,10 @@ class LabelPermission(OpenPolicyAgentPermission):
 
     @classmethod
     def create(cls, request, view, obj):
-        Scopes = __class__.Scopes
-
         permissions = []
         if view.basename == 'label':
+            Scopes = __class__.Scopes
+
             for scope in cls.get_scopes(request, view, obj):
                 if scope in [Scopes.DELETE, Scopes.UPDATE, Scopes.VIEW]:
                     obj = cast(Label, obj)
@@ -1514,7 +1507,7 @@ class LabelPermission(OpenPolicyAgentPermission):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = settings.IAM_OPA_DATA_URL + '/labels/allow'
+        self.url = f'{settings.IAM_OPA_DATA_URL}/labels/allow'
 
     @staticmethod
     def get_scopes(request, view, obj):
@@ -1575,10 +1568,7 @@ class PolicyEnforcer(BasePermission):
         return allow
 
     def has_permission(self, request, view):
-        if not view.detail:
-            return self.check_permission(request, view, None)
-        else:
-            return True # has_object_permission will be called later
+        return self.check_permission(request, view, None) if not view.detail else True
 
     def has_object_permission(self, request, view, obj):
         return self.check_permission(request, view, obj)
@@ -1595,9 +1585,9 @@ class IsMemberInOrganization(BasePermission):
     def has_permission(self, request, view):
         user = request.user
         organization = request.iam_context['organization']
-        membership = request.iam_context['membership']
-
         if organization and not user.is_superuser:
+            membership = request.iam_context['membership']
+
             return membership is not None
 
         return True

@@ -23,10 +23,10 @@ class DeleteCache():
             return self._cache[instance_class].pop(instance_id, default)
 
     def has_key(self, instance_class, instance_id):
-        if instance_class in self._cache and \
-            instance_id in self._cache[instance_class]:
-            return True
-        return False
+        return (
+            instance_class in self._cache
+            and instance_id in self._cache[instance_class]
+        )
 
     def clear(self):
         self._cache.clear()

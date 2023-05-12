@@ -41,8 +41,7 @@ def create_arg_parser() -> ArgumentParser:
 
 def parse_args(args: Optional[Sequence[str]] = None) -> Namespace:
     parser = create_arg_parser()
-    parsed_args = parser.parse_args(args)
-    return parsed_args
+    return parser.parse_args(args)
 
 
 def call_generator(module_path: str, gen_params: Namespace):

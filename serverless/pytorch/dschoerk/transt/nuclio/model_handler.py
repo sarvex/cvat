@@ -34,8 +34,7 @@ class ModelHandler:
             self.tracker.features_initialized = jsonpickle.decode(state['model.features_initialized'])
 
     def encode_state(self):
-        state = {}
-        state['model.net.net.zf'] = jsonpickle.encode(self.tracker.net.net.zf)
+        state = {'model.net.net.zf': jsonpickle.encode(self.tracker.net.net.zf)}
         state['model.net.net.pos_template'] = jsonpickle.encode(self.tracker.net.net.pos_template)
         state['model.window'] = jsonpickle.encode(self.tracker.window)
         state['model.center_pos'] = jsonpickle.encode(self.tracker.center_pos)
@@ -69,10 +68,8 @@ class ModelHandler:
             init_shape = (shape[0], shape[1], shape[2] - shape[0], shape[3] - shape[1])
 
             self.init_tracker(image, init_shape)
-            state = self.encode_state()
         else:
             self.decode_state(state)
             shape = self.track(image)
-            state = self.encode_state()
-
+        state = self.encode_state()
         return shape, state

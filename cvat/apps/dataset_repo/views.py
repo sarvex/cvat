@@ -41,17 +41,17 @@ def check_process(request, rq_id):
         queue = django_rq.get_queue(settings.CVAT_QUEUES.EXPORT_DATA.value)
         rq_job = queue.fetch_job(rq_id)
 
-        if rq_job is not None:
-            if rq_job.is_queued or rq_job.is_started:
-                return Response({"status": rq_job.get_status()})
-            elif rq_job.is_finished:
-                return Response({"status": rq_job.get_status()})
-            else:
-                return Response({"status": rq_job.get_status(), "stderr": rq_job.exc_info})
-        else:
+        if rq_job is None:
             return Response({"status": "unknown"})
+        if rq_job.is_queued or rq_job.is_started or rq_job.is_finished:
+            return Response({"status": rq_job.get_status()})
+        else:
+            return Response({"status": rq_job.get_status(), "stderr": rq_job.exc_info})
     except Exception as ex:
-        slogger.glob.error("error occurred during checking repository request with rq id {}".format(rq_id), exc_info=True)
+        slogger.glob.error(
+            f"error occurred during checking repository request with rq id {rq_id}",
+            exc_info=True,
+        )
         return HttpResponseBadRequest(str(ex))
 
 
@@ -65,13 +65,16 @@ def create(request: Request, tid):
         path = body["path"]
         export_format = body.get("format")
         lfs = body["lfs"]
-        rq_id = "git.create.{}".format(tid)
+        rq_id = f"git.create.{tid}"
         queue = django_rq.get_queue(settings.CVAT_QUEUES.EXPORT_DATA.value)
 
         queue.enqueue_call(func = CVATGit.initial_create, args = (tid, path, export_format, lfs, request.user), job_id = rq_id)
         return Response({ "rq_id": rq_id })
     except Exception as ex:
-        slogger.glob.error("error occurred during initial cloning repository request with rq id {}".format(rq_id), exc_info=True)
+        slogger.glob.error(
+            f"error occurred during initial cloning repository request with rq id {rq_id}",
+            exc_info=True,
+        )
         return HttpResponseBadRequest(str(ex))
 
 
@@ -80,7 +83,7 @@ def push_repository(request: Request, tid):
     try:
         slogger.task[tid].info("push repository request")
 
-        rq_id = "git.push.{}".format(tid)
+        rq_id = f"git.push.{tid}"
         queue = django_rq.get_queue(settings.CVAT_QUEUES.EXPORT_DATA.value)
         queue.enqueue_call(func = CVATGit.push, args = (tid, request.user, request.scheme, request.get_host()), job_id = rq_id)
 
@@ -137,10 +140,7 @@ def update_git_repo(request: Request, tid):
 def get_meta_info(request):
     try:
         db_git_records = GitData.objects.all()
-        response = {}
-        for db_git in db_git_records:
-            response[db_git.task_id] = db_git.status
-
+        response = {db_git.task_id: db_git.status for db_git in db_git_records}
         return Response(response)
     except Exception as ex:
         slogger.glob.exception("error occurred during get meta request", exc_info = True)

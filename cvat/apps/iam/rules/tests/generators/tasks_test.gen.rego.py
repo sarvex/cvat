@@ -144,17 +144,17 @@ def get_data(scope, context, ownership, privilege, membership, resource, same_or
         if same_org:
             data["resource"]["organization"]["id"] = org_id
 
-    if ownership == "owner":
-        data["resource"]["owner"]["id"] = user_id
-
     if ownership == "assignee":
         data["resource"]["assignee"]["id"] = user_id
 
-    if ownership == "project:owner":
-        data["resource"]["project"]["owner"]["id"] = user_id
+    elif ownership == "owner":
+        data["resource"]["owner"]["id"] = user_id
 
-    if ownership == "project:assignee":
+    elif ownership == "project:assignee":
         data["resource"]["project"]["assignee"]["id"] = user_id
+
+    elif ownership == "project:owner":
+        data["resource"]["project"]["owner"]["id"] = user_id
 
     return data
 
@@ -162,7 +162,7 @@ def get_data(scope, context, ownership, privilege, membership, resource, same_or
 def _get_name(prefix, **kwargs):
     name = prefix
     for k, v in kwargs.items():
-        prefix = "_" + str(k)
+        prefix = f"_{str(k)}"
         if isinstance(v, dict):
             if "id" in v:
                 v = v.copy()
@@ -193,10 +193,7 @@ def is_valid(scope, context, ownership, privilege, membership, resource, same_or
         return False
     if scope.startswith("create") and ownership in ["owner", "assignee"]:
         return False
-    if scope in ["create", "import:backup"] and ownership != "None":
-        return False
-
-    return True
+    return scope not in ["create", "import:backup"] or ownership == "None"
 
 
 def gen_test_rego(name):

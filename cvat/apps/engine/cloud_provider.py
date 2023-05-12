@@ -135,7 +135,7 @@ class _CloudStorage(ABC):
             with open(path, 'wb') as f:
                 f.write(file_obj.getvalue())
         else:
-            raise NotImplementedError("Unsupported type {} was found".format(type(file_obj)))
+            raise NotImplementedError(f"Unsupported type {type(file_obj)} was found")
 
     @abstractmethod
     def upload_fileobj(self, file_obj, file_name):
@@ -265,10 +265,7 @@ class AWS_S3(_CloudStorage):
             return Status.AVAILABLE
         except ClientError as ex:
             code = ex.response['Error']['Code']
-            if code == '403':
-                return Status.FORBIDDEN
-            else:
-                return Status.NOT_FOUND
+            return Status.FORBIDDEN if code == '403' else Status.NOT_FOUND
 
     def get_file_status(self, key):
         try:
@@ -276,10 +273,7 @@ class AWS_S3(_CloudStorage):
             return Status.AVAILABLE
         except ClientError as ex:
             code = ex.response['Error']['Code']
-            if code == '403':
-                return Status.FORBIDDEN
-            else:
-                return Status.NOT_FOUND
+            return Status.FORBIDDEN if code == '403' else Status.NOT_FOUND
 
     @validate_file_status
     @validate_bucket_status
@@ -337,10 +331,8 @@ class AWS_S3(_CloudStorage):
                 ObjectLockEnabledForBucket=False
             )
             slogger.glob.info(
-                'Bucket {} has been created on {} region'.format(
-                    self.name,
-                    responce['Location']
-                ))
+                f"Bucket {self.name} has been created on {responce['Location']} region"
+            )
         except Exception as ex:
             msg = str(ex)
             slogger.glob.info(msg)
@@ -374,9 +366,7 @@ class AWS_S3(_CloudStorage):
             's3:GetObject': Permissions.READ,
             's3:PutObject': Permissions.WRITE,
         }
-        allowed_actions = Permissions.all() & {access.get(i) for i in allowed_actions}
-
-        return allowed_actions
+        return Permissions.all() & {access.get(i) for i in allowed_actions}
 
 class AzureBlobContainer(_CloudStorage):
     MAX_CONCURRENCY = 3
@@ -413,7 +403,7 @@ class AzureBlobContainer(_CloudStorage):
     @property
     def account_url(self) -> Optional[str]:
         if self._account_name:
-            return "{}.blob.core.windows.net".format(self._account_name)
+            return f"{self._account_name}.blob.core.windows.net"
         return None
 
     def create(self):
@@ -446,20 +436,14 @@ class AzureBlobContainer(_CloudStorage):
             self._head()
             return Status.AVAILABLE
         except HttpResponseError as ex:
-            if  ex.status_code == 403:
-                return Status.FORBIDDEN
-            else:
-                return Status.NOT_FOUND
+            return Status.FORBIDDEN if ex.status_code == 403 else Status.NOT_FOUND
 
     def get_file_status(self, key):
         try:
             self._head_file(key)
             return Status.AVAILABLE
         except HttpResponseError as ex:
-            if  ex.status_code == 403:
-                return Status.FORBIDDEN
-            else:
-                return Status.NOT_FOUND
+            return Status.FORBIDDEN if ex.status_code == 403 else Status.NOT_FOUND
 
     @validate_bucket_status
     def upload_fileobj(self, file_obj, file_name):
@@ -594,11 +578,8 @@ class GoogleCloudStorage(_CloudStorage):
                 location=self._bucket_location
             )
             slogger.glob.info(
-                'Bucket {} has been created at {} region for {}'.format(
-                    self.name,
-                    self.bucket.location,
-                    self.bucket.user_project,
-                ))
+                f'Bucket {self.name} has been created at {self.bucket.location} region for {self.bucket.user_project}'
+            )
         except Exception as ex:
             msg = str(ex)
             slogger.glob.info(msg)
@@ -652,7 +633,9 @@ class Credentials:
         elif self.credentials_type == CredentialsTypeChoice.CONNECTION_STRING:
             self.connection_string = credentials.get('value')
         else:
-            raise NotImplementedError('Found {} not supported credentials type'.format(self.credentials_type))
+            raise NotImplementedError(
+                f'Found {self.credentials_type} not supported credentials type'
+            )
 
     def reset(self, exclusion):
         for i in set(self.__slots__) - exclusion - {'credentials_type'}:

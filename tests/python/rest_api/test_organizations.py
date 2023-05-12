@@ -38,7 +38,7 @@ class TestMetadataOrganizations:
             "username"
         ]
 
-        response = options_method(user, f"organizations")
+        response = options_method(user, "organizations")
         assert response.status_code == HTTPStatus.OK
 
         response = options_method(user, f"organizations/{self._ORG}")

@@ -44,11 +44,14 @@ class ORIENTATION(IntEnum):
 
 
 def get_mime(name):
-    for type_name, type_def in MEDIA_TYPES.items():
-        if type_def['has_mime_type'](name):
-            return type_name
-
-    return 'unknown'
+    return next(
+        (
+            type_name
+            for type_name, type_def in MEDIA_TYPES.items()
+            if type_def['has_mime_type'](name)
+        ),
+        'unknown',
+    )
 
 def create_tmp_dir():
     return tempfile.mkdtemp(prefix='cvat-', suffix='.data')
@@ -59,9 +62,7 @@ def delete_tmp_dir(tmp_dir):
 
 def files_to_ignore(directory):
     ignore_files = ('__MSOSX', '._.DS_Store', '__MACOSX', '.DS_Store')
-    if not any(ignore_file in directory for ignore_file in ignore_files):
-        return True
-    return False
+    return all(ignore_file not in directory for ignore_file in ignore_files)
 
 def sort(images, sorting_method=SortingMethod.LEXICOGRAPHICAL, func=None):
     if sorting_method == SortingMethod.LEXICOGRAPHICAL:
@@ -78,9 +79,7 @@ def sort(images, sorting_method=SortingMethod.LEXICOGRAPHICAL, func=None):
 
 def image_size_within_orientation(img: Image):
     orientation = img.getexif().get(ORIENTATION_EXIF_TAG, ORIENTATION.NORMAL_HORIZONTAL)
-    if orientation > 4:
-        return img.height, img.width
-    return img.width, img.height
+    return (img.height, img.width) if orientation > 4 else (img.width, img.height)
 
 def rotate_within_exif(img: Image):
     orientation = img.getexif().get(ORIENTATION_EXIF_TAG,  ORIENTATION.NORMAL_HORIZONTAL)
@@ -122,10 +121,7 @@ class IMediaReader(ABC):
     def _get_preview(obj):
         PREVIEW_SIZE = (256, 256)
 
-        if isinstance(obj, io.IOBase):
-            preview = Image.open(obj)
-        else:
-            preview = obj
+        preview = Image.open(obj) if isinstance(obj, io.IOBase) else obj
         preview = rotate_within_exif(preview)
         # TODO - Check if the other formats work. I'm only interested in I;16 for now. Sorry @:-|
         # Summary:
@@ -169,10 +165,7 @@ class ImageListReader(IMediaReader):
         if not source_path:
             raise Exception('No image found')
 
-        if not stop:
-            stop = len(source_path)
-        else:
-            stop = min(len(source_path), stop + 1)
+        stop = len(source_path) if not stop else min(len(source_path), stop + 1)
         step = max(step, 1)
         assert stop > start
 
@@ -412,12 +405,11 @@ class VideoReader(IMediaReader):
         )
 
     def _has_frame(self, i):
-        if i >= self._start:
-            if (i - self._start) % self._step == 0:
-                if self._stop is None or i < self._stop:
-                    return True
-
-        return False
+        return (
+            i >= self._start
+            and (i - self._start) % self._step == 0
+            and (self._stop is None or i < self._stop)
+        )
 
     def _decode(self, container):
         frame_num = 0
@@ -882,9 +874,7 @@ class ValidateDimension:
                 if "DATA" in line:
                     break
             if verify_version:
-                if "VERSION" in kv and kv["VERSION"] in pcd_version:
-                    return True
-                return None
+                return True if "VERSION" in kv and kv["VERSION"] in pcd_version else None
             return kv
         except AttributeError:
             return None
@@ -957,9 +947,8 @@ class ValidateDimension:
                 else:
                     pcd_files[file_name] = path
                     self.related_files[path] = []
-            else:
-                if _is_image(file_path):
-                    self.image_files[file_name] = file_path
+            elif _is_image(file_path):
+                self.image_files[file_name] = file_path
         return pcd_files
 
     def validate(self):

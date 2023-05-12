@@ -91,10 +91,7 @@ class InvitationWriteSerializer(serializers.ModelSerializer):
         if not created:
             raise serializers.ValidationError('The user is a member of '
                 'the organization already.')
-        invitation = Invitation.objects.create(**validated_data,
-            membership=membership)
-
-        return invitation
+        return Invitation.objects.create(**validated_data, membership=membership)
 
     def update(self, instance, validated_data):
         return super().update(instance, {})

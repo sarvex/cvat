@@ -66,10 +66,9 @@ class _BackupBase():
         self._logger = logger
 
     def _prepare_meta(self, allowed_keys, meta):
-        keys_to_drop = set(meta.keys()) - allowed_keys
-        if keys_to_drop:
+        if keys_to_drop := set(meta.keys()) - allowed_keys:
             if self._logger:
-                self._logger.warning('the following keys are dropped {}'.format(keys_to_drop))
+                self._logger.warning(f'the following keys are dropped {keys_to_drop}')
             for key in keys_to_drop:
                 del meta[key]
 
@@ -223,8 +222,7 @@ class _TaskBackupBase(_BackupBase):
         if self._db_task:
             db_segments = list(self._db_task.segment_set.all().prefetch_related('job_set'))
             db_segments.sort(key=lambda i: i.job_set.first().id)
-            db_jobs = (s.job_set.first() for s in db_segments)
-            return db_jobs
+            return (s.job_set.first() for s in db_segments)
         return ()
 
 class _ExporterBase():
@@ -349,7 +347,7 @@ class TaskExporter(_ExporterBase, _TaskBackupBase):
             if self._db_task.mode == 'annotation':
                 files: Iterable[models.Image] = self._db_data.images.all().order_by('frame')
                 segment_files = files[db_segment.start_frame : db_segment.stop_frame + 1]
-                return {'files': list(frame.path for frame in segment_files)}
+                return {'files': [frame.path for frame in segment_files]}
             else:
                 assert False, (
                     "Backups with custom file mapping are not supported"
@@ -423,7 +421,7 @@ class _ImporterBase():
         try:
             return Version(version)
         except ValueError:
-            raise ValueError('{} version is not supported'.format(version))
+            raise ValueError(f'{version} version is not supported')
 
     @staticmethod
     def _prepare_dirs(filepath):
@@ -433,16 +431,7 @@ class _ImporterBase():
 
     def _create_labels(self, labels, db_task=None, db_project=None, parent_label=None):
         label_mapping = {}
-        if db_task:
-            label_relation = {
-                'task': db_task
-            }
-        else:
-            label_relation = {
-                'project': db_project
-            }
-
-
+        label_relation = {'task': db_task} if db_task else {'project': db_project}
         for label in labels:
             label_name = label['name']
             attributes = label.pop('attributes', [])
@@ -455,7 +444,7 @@ class _ImporterBase():
                 'attributes': {},
             }
 
-            label_mapping.update(self._create_labels(sublabels, db_task, db_project, db_label))
+            label_mapping |= self._create_labels(sublabels, db_task, db_project, db_label)
 
             if db_label.type == str(models.LabelType.SKELETON):
                 for db_sublabel in list(db_label.sublabels.all()):
@@ -724,7 +713,7 @@ class ProjectImporter(_ImporterBase, _ProjectBackupBase):
             for fname in zip_object.namelist():
                 m = re.match(self.TASKNAME_RE, fname)
                 if m:
-                    tasks[int(m.group(1))] = m.group(0)
+                    tasks[int(m[1])] = m[0]
             return [v for _, v in sorted(tasks.items())]
 
         with ZipFile(self._filename, 'r') as zf:
@@ -774,12 +763,8 @@ def _create_backup(db_instance, Exporter, output_path, logger, cache_ttl):
                 file_ctime=archive_ctime,
                 logger=logger)
             logger.info(
-                "The {} '{}' is backuped at '{}' "
-                "and available for downloading for the next {}. "
-                "Export cache cleaning job is enqueued, id '{}'".format(
-                    "project" if isinstance(db_instance, Project) else 'task',
-                    db_instance.name, output_path, cache_ttl,
-                    cleaning_job.id))
+                f"""The {"project" if isinstance(db_instance, Project) else 'task'} '{db_instance.name}' is backuped at '{output_path}' and available for downloading for the next {cache_ttl}. Export cache cleaning job is enqueued, id '{cleaning_job.id}'"""
+            )
 
         return output_path
     except Exception:
@@ -807,8 +792,7 @@ def export(db_instance, request, queue_name):
         cache_ttl = PROJECT_CACHE_TTL
         use_target_storage_conf = request.query_params.get('use_default_location', True)
     else:
-        raise Exception(
-            "Unexpected type of db_isntance: {}".format(type(db_instance)))
+        raise Exception(f"Unexpected type of db_isntance: {type(db_instance)}")
     use_settings = strtobool(str(use_target_storage_conf))
     obj = db_instance if use_settings else request.query_params
     location_conf = get_location_configuration(
@@ -819,70 +803,76 @@ def export(db_instance, request, queue_name):
 
     queue = django_rq.get_queue(queue_name)
     rq_id = f"export:{obj_type}.id{db_instance.pk}-by-{request.user}"
-    rq_job = queue.fetch_job(rq_id)
-    if rq_job:
+    if rq_job := queue.fetch_job(rq_id):
         last_project_update_time = timezone.localtime(db_instance.updated_date)
         rq_request = rq_job.meta.get('request', None)
         request_time = rq_request.get("timestamp", None) if rq_request else None
         if request_time is None or request_time < last_project_update_time:
             rq_job.cancel()
             rq_job.delete()
-        else:
-            if rq_job.is_finished:
-                file_path = rq_job.return_value
-                if action == "download" and os.path.exists(file_path):
-                    rq_job.delete()
-
-                    timestamp = datetime.strftime(last_project_update_time,
-                        "%Y_%m_%d_%H_%M_%S")
-                    filename = filename or "{}_{}_backup_{}{}".format(
-                        obj_type, db_instance.name, timestamp,
-                        os.path.splitext(file_path)[1]).lower()
-
-                    location = location_conf.get('location')
-                    if location == Location.LOCAL:
-                        return sendfile(request, file_path, attachment=True,
-                            attachment_filename=filename)
-                    elif location == Location.CLOUD_STORAGE:
-                        try:
-                            storage_id = location_conf['storage_id']
-                        except KeyError:
-                            raise serializers.ValidationError(
-                                'Cloud storage location was selected as the destination,'
-                                ' but cloud storage id was not specified')
-
-                        db_storage = get_cloud_storage_for_import_or_export(
-                            storage_id=storage_id, request=request,
-                            is_default=location_conf['is_default'])
-                        storage = db_storage_to_storage_instance(db_storage)
-
-                        try:
-                            storage.upload_file(file_path, filename)
-                        except (ValidationError, PermissionDenied, NotFound) as ex:
-                            msg = str(ex) if not isinstance(ex, ValidationError) else \
-                                '\n'.join([str(d) for d in ex.detail])
-                            return Response(data=msg, status=ex.status_code)
-                        return Response(status=status.HTTP_200_OK)
-                    else:
-                        raise NotImplementedError()
-                else:
-                    if os.path.exists(file_path):
-                        return Response(status=status.HTTP_201_CREATED)
-            elif rq_job.is_failed:
-                exc_info = str(rq_job.exc_info)
+        elif rq_job.is_finished:
+            file_path = rq_job.return_value
+            if action == "download" and os.path.exists(file_path):
                 rq_job.delete()
-                return Response(exc_info,
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            else:
-                return Response(status=status.HTTP_202_ACCEPTED)
+
+                timestamp = datetime.strftime(last_project_update_time,
+                    "%Y_%m_%d_%H_%M_%S")
+                filename = (
+                    filename
+                    or f"{obj_type}_{db_instance.name}_backup_{timestamp}{os.path.splitext(file_path)[1]}".lower()
+                )
+
+                location = location_conf.get('location')
+                if location == Location.LOCAL:
+                    return sendfile(request, file_path, attachment=True,
+                        attachment_filename=filename)
+                elif location == Location.CLOUD_STORAGE:
+                    try:
+                        storage_id = location_conf['storage_id']
+                    except KeyError:
+                        raise serializers.ValidationError(
+                            'Cloud storage location was selected as the destination,'
+                            ' but cloud storage id was not specified')
+
+                    db_storage = get_cloud_storage_for_import_or_export(
+                        storage_id=storage_id, request=request,
+                        is_default=location_conf['is_default'])
+                    storage = db_storage_to_storage_instance(db_storage)
+
+                    try:
+                        storage.upload_file(file_path, filename)
+                    except (ValidationError, PermissionDenied, NotFound) as ex:
+                        msg = str(ex) if not isinstance(ex, ValidationError) else \
+                            '\n'.join([str(d) for d in ex.detail])
+                        return Response(data=msg, status=ex.status_code)
+                    return Response(status=status.HTTP_200_OK)
+                else:
+                    raise NotImplementedError()
+            elif os.path.exists(file_path):
+                return Response(status=status.HTTP_201_CREATED)
+        elif rq_job.is_failed:
+            exc_info = str(rq_job.exc_info)
+            rq_job.delete()
+            return Response(exc_info,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response(status=status.HTTP_202_ACCEPTED)
 
     ttl = dm.views.PROJECT_CACHE_TTL.total_seconds()
     queue.enqueue_call(
         func=_create_backup,
-        args=(db_instance, Exporter, '{}_backup.zip'.format(obj_type), logger, cache_ttl),
+        args=(
+            db_instance,
+            Exporter,
+            f'{obj_type}_backup.zip',
+            logger,
+            cache_ttl,
+        ),
         job_id=rq_id,
         meta=get_rq_job_meta(request=request, db_obj=db_instance),
-        result_ttl=ttl, failure_ttl=ttl)
+        result_ttl=ttl,
+        failure_ttl=ttl,
+    )
     return Response(status=status.HTTP_202_ACCEPTED)
 
 
@@ -948,27 +938,26 @@ def _import(importer, request, queue, rq_id, Serializer, file_field_name, locati
             },
             depends_on=dependent_job
         )
-    else:
-        if rq_job.is_finished:
-            project_id = rq_job.return_value
-            if rq_job.meta['tmp_file_descriptor']: os.close(rq_job.meta['tmp_file_descriptor'])
-            os.remove(rq_job.meta['tmp_file'])
-            rq_job.delete()
-            return Response({'id': project_id}, status=status.HTTP_201_CREATED)
-        elif rq_job.is_failed or \
+    elif rq_job.is_finished:
+        project_id = rq_job.return_value
+        if rq_job.meta['tmp_file_descriptor']: os.close(rq_job.meta['tmp_file_descriptor'])
+        os.remove(rq_job.meta['tmp_file'])
+        rq_job.delete()
+        return Response({'id': project_id}, status=status.HTTP_201_CREATED)
+    elif rq_job.is_failed or \
                 rq_job.is_deferred and rq_job.dependency and rq_job.dependency.is_failed:
-            exc_info = process_failed_job(rq_job)
+        exc_info = process_failed_job(rq_job)
             # RQ adds a prefix with exception class name
-            import_error_prefix = '{}.{}'.format(
-                CvatImportError.__module__, CvatImportError.__name__)
-            if exc_info.startswith(import_error_prefix):
-                exc_info = exc_info.replace(import_error_prefix + ': ', '')
-                return Response(data=exc_info,
-                    status=status.HTTP_400_BAD_REQUEST)
-            else:
-                return Response(data=exc_info,
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        import_error_prefix = (
+            f'{CvatImportError.__module__}.{CvatImportError.__name__}'
+        )
+        if not exc_info.startswith(import_error_prefix):
+            return Response(data=exc_info,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        exc_info = exc_info.replace(f'{import_error_prefix}: ', '')
+        return Response(data=exc_info,
+            status=status.HTTP_400_BAD_REQUEST)
     return Response({'rq_id': rq_id}, status=status.HTTP_202_ACCEPTED)
 
 def get_backup_dirname():

@@ -39,8 +39,8 @@ class ProjectAnnotationAndData:
         self.db_project = models.Project.objects.get(id=pk)
         self.db_tasks = models.Task.objects.filter(project__id=pk).order_by('id')
 
-        self.task_annotations: dict[int, TaskAnnotation] = dict()
-        self.annotation_irs: dict[int, AnnotationIR] = dict()
+        self.task_annotations: dict[int, TaskAnnotation] = {}
+        self.annotation_irs: dict[int, AnnotationIR] = {}
 
         self.tasks_to_add: list[models.Task] = []
 
@@ -88,7 +88,7 @@ class ProjectAnnotationAndData:
             'data_id': db_data.id,
             'project_id': self.db_project.id
         })
-        data = {k:v for k, v in data_serializer.data.items()}
+        data = dict(data_serializer.data.items())
         data['use_zip_chunks'] = data_serializer.validated_data['use_zip_chunks']
         data['use_cache'] = data_serializer.validated_data['use_cache']
         data['copy_data'] = data_serializer.validated_data['copy_data']

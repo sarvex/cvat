@@ -81,7 +81,7 @@ class ExtractBoundingBoxes:
             if shape.rotation != 0:
                 raise UnsupportedDatasetError("Rotated shapes are not supported")
 
-            x_coords = shape.points[0::2]
+            x_coords = shape.points[::2]
             y_coords = shape.points[1::2]
 
             boxes.append((min(x_coords), min(y_coords), max(x_coords), max(y_coords)))

@@ -36,20 +36,20 @@ class TestCreateInvitations:
 
     @staticmethod
     def get_non_member_users(memberships, users):
-        organization_users = set(m["user"]["id"] for m in memberships if m["user"] is not None)
-        non_member_users = [u for u in users if u["id"] not in organization_users]
-
-        return non_member_users
+        organization_users = {
+            m["user"]["id"] for m in memberships if m["user"] is not None
+        }
+        return [u for u in users if u["id"] not in organization_users]
 
     @staticmethod
     def get_member(role, memberships, org_id):
-        member = [
+        return [
             m["user"]
             for m in memberships
-            if m["role"] == role and m["organization"] == org_id and m["user"] is not None
+            if m["role"] == role
+            and m["organization"] == org_id
+            and m["user"] is not None
         ][0]
-
-        return member
 
     @pytest.mark.parametrize("org_role", ROLES)
     @pytest.mark.parametrize("invitee_role", ROLES)

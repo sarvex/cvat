@@ -23,19 +23,11 @@ from .utils import CollectionSimpleFilterTestBase, export_dataset
 
 
 def get_job_staff(job, tasks, projects):
-    job_staff = []
-    job_staff.append(job["assignee"])
     tid = job["task_id"]
-    job_staff.append(tasks[tid]["owner"])
-    job_staff.append(tasks[tid]["assignee"])
-
-    pid = job["project_id"]
-    if pid:
-        job_staff.append(projects[pid]["owner"])
-        job_staff.append(projects[pid]["assignee"])
-    job_staff = set(u["id"] for u in job_staff if u is not None)
-
-    return job_staff
+    job_staff = [job["assignee"], *(tasks[tid]["owner"], tasks[tid]["assignee"])]
+    if pid := job["project_id"]:
+        job_staff.extend((projects[pid]["owner"], projects[pid]["assignee"]))
+    return {u["id"] for u in job_staff if u is not None}
 
 
 def filter_jobs(jobs, tasks, org):

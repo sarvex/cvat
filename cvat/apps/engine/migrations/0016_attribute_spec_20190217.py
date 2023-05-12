@@ -8,26 +8,22 @@ from django.conf import settings
 from cvat.apps.engine.media_extractors import get_mime
 
 def parse_attribute(value):
-    match = re.match(r'^([~@])(\w+)=(\w+):(.+)?$', value)
-    if match:
-        prefix = match.group(1)
-        input_type = match.group(2)
-        name = match.group(3)
-        if match.group(4):
-            values = list(csv.reader(StringIO(match.group(4)),
-                quotechar="'"))[0]
-        else:
-            values = []
-
-        return {'prefix':prefix, 'type':input_type, 'name':name, 'values':values}
-    else:
+    if not (match := re.match(r'^([~@])(\w+)=(\w+):(.+)?$', value)):
         return None
+    prefix = match[1]
+    input_type = match[2]
+    name = match[3]
+    values = (
+        list(csv.reader(StringIO(match[4]), quotechar="'"))[0]
+        if match[4]
+        else []
+    )
+    return {'prefix':prefix, 'type':input_type, 'name':name, 'values':values}
 
 def split_text_attribute(apps, schema_editor):
     AttributeSpec = apps.get_model('engine', 'AttributeSpec')
     for attribute in AttributeSpec.objects.all():
-        spec = parse_attribute(attribute.text)
-        if spec:
+        if spec := parse_attribute(attribute.text):
             attribute.mutable = (spec['prefix'] == '~')
             attribute.input_type = spec['type']
             attribute.name = spec['name']
@@ -38,14 +34,9 @@ def split_text_attribute(apps, schema_editor):
 def join_text_attribute(apps, schema_editor):
     AttributeSpec = apps.get_model('engine', 'AttributeSpec')
     for attribute in AttributeSpec.objects.all():
-        attribute.text = ""
-        if attribute.mutable:
-            attribute.text += "~"
-        else:
-            attribute.text += "@"
-
+        attribute.text = "" + ("~" if attribute.mutable else "@")
         attribute.text += attribute.input_type
-        attribute.text += "=" + attribute.name + ":"
+        attribute.text += f"={attribute.name}:"
         attribute.text += ",".join(attribute.values.split('\n'))
         attribute.save()
 
@@ -61,7 +52,7 @@ def _get_frame_path(task_obj, frame):
         "data",
         str(int(frame) // 10000),
         str(int(frame) // 100),
-        str(frame) + '.jpg',
+        f'{str(frame)}.jpg',
     )
 
 def fill_task_meta_data_forward(apps, schema_editor):
@@ -135,10 +126,7 @@ def fill_task_meta_data_backward(apps, schema_editor):
             video.delete()
         else:
             images = image_model.objects.filter(task__id=db_task.id)
-            db_task.source = '{} images: {}, ...'.format(
-                len(images),
-                ", ".join([os.path.relpath(x.path, upload_dir) for x in images[0:2]])
-            )
+            db_task.source = f'{len(images)} images: {", ".join([os.path.relpath(x.path, upload_dir) for x in images[:2]])}, ...'
             images.delete()
         db_task.save()
 

@@ -50,14 +50,14 @@ def scale_bbox(x, y, h, w, class_id, confidence, h_scale, w_scale):
 def parse_yolo_region(blob, resized_image_shape, original_im_shape, params, threshold):
     # ------------------------------------------ Validating output parameters ------------------------------------------
     _, _, out_blob_h, out_blob_w = blob.shape
-    assert out_blob_w == out_blob_h, "Invalid size of output blob. It should be in NCHW layout and height should " \
-                                     "be equal to width. Current height = {}, current width = {}" \
-                                     "".format(out_blob_h, out_blob_w)
+    assert (
+        out_blob_w == out_blob_h
+    ), f"Invalid size of output blob. It should be in NCHW layout and height should be equal to width. Current height = {out_blob_h}, current width = {out_blob_w}"
 
     # ------------------------------------------ Extracting layer parameters -------------------------------------------
     orig_im_h, orig_im_w = original_im_shape
     resized_image_h, resized_image_w = resized_image_shape
-    objects = list()
+    objects = []
     predictions = blob.flatten()
     side_square = params.side * params.side
 
@@ -105,9 +105,7 @@ def intersection_over_union(box_1, box_2):
     box_1_area = (box_1['ymax'] - box_1['ymin']) * (box_1['xmax'] - box_1['xmin'])
     box_2_area = (box_2['ymax'] - box_2['ymin']) * (box_2['xmax'] - box_2['xmin'])
     area_of_union = box_1_area + box_2_area - area_of_overlap
-    if area_of_union == 0:
-        return 0
-    return area_of_overlap / area_of_union
+    return 0 if area_of_union == 0 else area_of_overlap / area_of_union
 
 
 class ModelHandler:

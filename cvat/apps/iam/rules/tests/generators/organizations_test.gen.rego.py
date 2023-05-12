@@ -89,8 +89,8 @@ def get_data(scope, context, ownership, privilege, membership, resource):
         "resource": {**resource, "owner": {"id": random.randrange(300, 400)}} if resource else None,
     }
 
-    user_id = data["auth"]["user"]["id"]
     if ownership == "owner":
+        user_id = data["auth"]["user"]["id"]
         data["resource"]["owner"]["id"] = user_id
 
     return data
@@ -99,12 +99,8 @@ def get_data(scope, context, ownership, privilege, membership, resource):
 def _get_name(prefix, **kwargs):
     name = prefix
     for k, v in kwargs.items():
-        name += "_" + str(k)
-        if isinstance(v, dict):
-            name += _get_name("", **v)
-        else:
-            name += f"_{str(v).upper()}"
-
+        name += f"_{str(k)}"
+        name += _get_name("", **v) if isinstance(v, dict) else f"_{str(v).upper()}"
     return name
 
 
@@ -119,10 +115,7 @@ def is_valid(scope, context, ownership, privilege, membership, resource):
         return False
     if resource is None and scope != "list":
         return False
-    if scope == "list" and ownership != "None":
-        return False
-
-    return True
+    return scope != "list" or ownership == "None"
 
 
 def gen_test_rego(name):

@@ -38,11 +38,12 @@ class EventTypeChoice:
 
 class AllEvents:
     webhook_type = "all"
-    events = list(
+    events = [
         event_name(action, resource)
         for resource, actions in Events.RESOURCES.items()
         for action in actions
-    )
+    ]
+
 
 
 class ProjectEvents:

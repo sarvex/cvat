@@ -59,7 +59,7 @@ class AttributesExtractorHandler:
         age_gender_request = self.age_gender_model.async_infer(image)
         emotions_request = self.emotions_model.async_infer(image)
         # Wait until both age_gender and emotion recognition async inferences finish
-        while not (age_gender_request.wait(0) == 0 and emotions_request.wait(0) == 0):
+        while age_gender_request.wait(0) != 0 or emotions_request.wait(0) != 0:
             continue
         age = int(np.squeeze(age_gender_request.output_blobs["age_conv3"].buffer) * 100)
         gender = self.genders_map[np.argmax(np.squeeze(age_gender_request.output_blobs["prob"].buffer))]

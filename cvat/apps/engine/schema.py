@@ -69,26 +69,29 @@ class DataSerializerExtension(OpenApiSerializerExtension):
         assert isinstance(instance, serializers.ModelSerializer)
 
         serializer_transformer = _SerializerTransformer(instance)
-        source_client_files = instance.fields['client_files']
-        source_server_files = instance.fields['server_files']
-        source_remote_files = instance.fields['remote_files']
+
 
         class _Override(self.target_class): # pylint: disable=inherit-non-class
+            source_client_files = instance.fields['client_files']
             client_files = serializers.ListField(
                 child=serializer_transformer.make_field('client_files', 'file'),
                 default=source_client_files.default,
                 help_text=source_client_files.help_text,
             )
+            source_server_files = instance.fields['server_files']
             server_files = serializers.ListField(
                 child=serializer_transformer.make_field('server_files', 'file'),
                 default=source_server_files.default,
                 help_text=source_server_files.help_text,
             )
+            source_remote_files = instance.fields['remote_files']
+
             remote_files = serializers.ListField(
                 child=serializer_transformer.make_field('remote_files', 'file'),
                 default=source_remote_files.default,
                 help_text=source_remote_files.help_text,
             )
+
 
         return auto_schema._map_serializer(
             _copy_serializer(instance, _new_type=_Override, context={'view': auto_schema.view}),
@@ -137,12 +140,11 @@ class OpenApiTypeProxySerializerExtension(PolymorphicProxySerializerExtension):
     priority = 0 # restore normal priority
 
     def _process_serializer(self, auto_schema, serializer, direction):
-        if isinstance(serializer, OpenApiTypes):
-            schema = build_basic_type(serializer)
-            return (None, schema)
-        else:
+        if not isinstance(serializer, OpenApiTypes):
             return super()._process_serializer(auto_schema=auto_schema,
                 serializer=serializer, direction=direction)
+        schema = build_basic_type(serializer)
+        return (None, schema)
 
     def map_serializer(self, auto_schema, direction):
         """ custom handling for @extend_schema's injection of PolymorphicProxySerializer """

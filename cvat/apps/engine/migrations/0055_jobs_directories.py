@@ -12,8 +12,7 @@ MIGRATION_LOG = os.path.join(settings.MIGRATIONS_LOGS_ROOT, f"{MIGRATION_NAME}.l
 
 def _get_query_set(apps):
     Job = apps.get_model("engine", "Job")
-    query_set = Job.objects.all()
-    return query_set
+    return Job.objects.all()
 
 def _get_job_dir_path(jid):
     return os.path.join(settings.JOBS_ROOT, str(jid))
@@ -26,7 +25,7 @@ def create_directories(apps, schema_editor):
     for db_job in query_set:
         jid = db_job.id
         os.makedirs(_get_job_dir_path(jid), exist_ok=True)
-    logger.info(f'Migration has been finished successfully.')
+    logger.info('Migration has been finished successfully.')
 
 def delete_directories(apps, schema_editor):
     logger = get_logger(MIGRATION_NAME, MIGRATION_LOG)
@@ -37,7 +36,7 @@ def delete_directories(apps, schema_editor):
         job_dir = _get_job_dir_path(jid)
         if os.path.isdir(job_dir):
             shutil.rmtree(job_dir)
-    logger.info(f'Migration has been reversed successfully.')
+    logger.info('Migration has been reversed successfully.')
 
 class Migration(migrations.Migration):
 

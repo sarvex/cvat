@@ -29,7 +29,7 @@ class TestTokenAuth:
         (auth, _) = client.auth_api.create_login(
             models.LoginSerializerExRequest(username=username, password=USER_PASS)
         )
-        client.set_default_header("Authorization", "Token " + auth.key)
+        client.set_default_header("Authorization", f"Token {auth.key}")
         return auth
 
     @classmethod

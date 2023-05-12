@@ -30,11 +30,11 @@ def _import(src_file, temp_dir, instance_data, load_data_callback=None, **kwargs
         dataset = Dataset.import_from(temp_dir, 'coco_instances', env=dm_env)
         if load_data_callback is not None:
             load_data_callback(dataset, instance_data)
-        import_dm_annotations(dataset, instance_data)
     else:
         dataset = Dataset.import_from(src_file.name,
             'coco_instances', env=dm_env)
-        import_dm_annotations(dataset, instance_data)
+
+    import_dm_annotations(dataset, instance_data)
 
 @exporter(name='COCO Keypoints', ext='ZIP', version='1.0')
 def _export(dst_file, temp_dir, instance_data, save_images=False):

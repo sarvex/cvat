@@ -94,9 +94,11 @@ def get_data(scope, context, ownership, privilege, membership, resource):
     }
 
     user_id = data["auth"]["user"]["id"]
-    if context == "organization":
-        if data["auth"]["organization"]["user"]["role"] == "owner":
-            data["auth"]["organization"]["owner"]["id"] = user_id
+    if (
+        context == "organization"
+        and data["auth"]["organization"]["user"]["role"] == "owner"
+    ):
+        data["auth"]["organization"]["owner"]["id"] = user_id
 
     if ownership == "self":
         data["resource"]["id"] = user_id
@@ -107,7 +109,7 @@ def get_data(scope, context, ownership, privilege, membership, resource):
 def _get_name(prefix, **kwargs):
     name = prefix
     for k, v in kwargs.items():
-        prefix = "_" + str(k)
+        prefix = f"_{str(k)}"
         if isinstance(v, dict):
             if "id" in v:
                 v = v.copy()
@@ -131,10 +133,7 @@ def is_valid(scope, context, ownership, privilege, membership, resource):
         return False
     if context == "sandbox" and resource["membership"]["role"] is not None:
         return False
-    if context == "organization" and membership is None:
-        return False
-
-    return True
+    return context != "organization" or membership is not None
 
 
 def gen_test_rego(name):

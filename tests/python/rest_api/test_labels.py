@@ -62,8 +62,7 @@ class _TestLabelsPermissionsBase:
     def _labels_by_source(labels: List[Dict], *, source_key: str) -> Dict[int, List[Dict]]:
         labels_by_source = {}
         for label in labels:
-            label_source = label.get(source_key)
-            if label_source:
+            if label_source := label.get(source_key):
                 labels_by_source.setdefault(label_source, []).append(label)
 
         return labels_by_source
@@ -216,19 +215,7 @@ class TestLabelsListFilters(CollectionSimpleFilterTestBase):
         return api_client.labels_api.list_endpoint
 
     def _get_field_samples(self, field: str) -> Tuple[Any, List[Dict[str, Any]]]:
-        if field == "parent":
-            parent_id, gt_objects = self._get_field_samples("parent_id")
-            parent_name = self._get_field(
-                next(
-                    filter(
-                        lambda p: parent_id == self._get_field(p, self._map_field("id")),
-                        self.samples,
-                    )
-                ),
-                self._map_field("name"),
-            )
-            return parent_name, gt_objects
-        elif field == "job_id":
+        if field == "job_id":
             field_path = ["id"]
             field_value = self._find_valid_field_value(self.job_samples, field_path)
             job_sample = next(
@@ -243,6 +230,18 @@ class TestLabelsListFilters(CollectionSimpleFilterTestBase):
                 self.samples,
             )
             return field_value, label_samples
+        elif field == "parent":
+            parent_id, gt_objects = self._get_field_samples("parent_id")
+            parent_name = self._get_field(
+                next(
+                    filter(
+                        lambda p: parent_id == self._get_field(p, self._map_field("id")),
+                        self.samples,
+                    )
+                ),
+                self._map_field("name"),
+            )
+            return parent_name, gt_objects
         else:
             return super()._get_field_samples(field)
 
@@ -584,9 +583,7 @@ class TestPatchLabels(_TestLabelsPermissionsBase):
     def _get_patch_data(
         self, original_data: Dict[str, Any], **overrides
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        result = deepcopy(original_data)
-        result.update(overrides)
-
+        result = deepcopy(original_data) | overrides
         ignore_fields = self.ignore_fields.copy()
         if overrides:
             payload = deepcopy(overrides)

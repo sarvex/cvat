@@ -15,6 +15,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
+
 import fcntl
 import mimetypes
 import os
@@ -50,7 +51,7 @@ except ImportError:
         os.mkdir(keys_dir)
     with open(os.path.join(keys_dir, 'secret_key.py'), 'w') as f:
         chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
-        f.write("SECRET_KEY = '{}'\n".format(get_random_string(50, chars)))
+        f.write(f"SECRET_KEY = '{get_random_string(50, chars)}'\n")
     from keys.secret_key import SECRET_KEY
 
 
@@ -80,7 +81,10 @@ def generate_ssh_keys():
             if 'has no identities' in keys[0]:
                 print('SSH keys were not found')
                 volume_keys = os.listdir(keys_dir)
-                if not ('id_rsa' in volume_keys and 'id_rsa.pub' in volume_keys):
+                if (
+                    'id_rsa' not in volume_keys
+                    or 'id_rsa.pub' not in volume_keys
+                ):
                     print('New pair of keys are being generated')
                     subprocess.run(['ssh-keygen -b 4096 -t rsa -f {}/id_rsa -q -N ""'.format(ssh_dir)], shell=True) # nosec
                     shutil.copyfile('{}/id_rsa'.format(ssh_dir), '{}/id_rsa'.format(keys_dir))
@@ -101,7 +105,7 @@ try:
     if os.getenv("SSH_AUTH_SOCK", None):
         generate_ssh_keys()
 except Exception as ex:
-    print(str(ex))
+    print(ex)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 INSTALLED_APPS = [
@@ -284,9 +288,6 @@ ACCOUNT_EMAIL_VERIFICATION_SENT_REDIRECT_URL = '/auth/email-verification-sent'
 INCORRECT_EMAIL_CONFIRMATION_URL = '/auth/incorrect-email-confirmation'
 
 OLD_PASSWORD_FIELD_ENABLED = True
-
-# Django-RQ
-# https://github.com/rq/django-rq
 
 class CVAT_QUEUES(Enum):
     IMPORT_DATA = 'import'

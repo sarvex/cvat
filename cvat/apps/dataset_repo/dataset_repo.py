@@ -26,17 +26,19 @@ from cvat.apps.engine.plugins import add_plugin
 
 
 def _have_no_access_exception(ex):
-    if 'Permission denied' in ex.stderr or 'Could not read from remote repository' in ex.stderr:
-        keys = subprocess.run(['ssh-add', '-L'], #nosec
-            stdout = subprocess.PIPE).stdout.decode('utf-8').split('\n')
-        keys = list(filter(len, list(map(lambda x: x.strip(), keys))))
-        raise Exception(
-            'Could not connect to the remote repository. ' +
-            'Please make sure you have the correct access rights and the repository exists. ' +
-            'Available public keys are: ' + str(keys)
-        )
-    else:
+    if (
+        'Permission denied' not in ex.stderr
+        and 'Could not read from remote repository' not in ex.stderr
+    ):
         raise ex
+    keys = subprocess.run(['ssh-add', '-L'], #nosec
+        stdout = subprocess.PIPE).stdout.decode('utf-8').split('\n')
+    keys = list(filter(len, list(map(lambda x: x.strip(), keys))))
+    raise Exception(
+        'Could not connect to the remote repository. ' +
+        'Please make sure you have the correct access rights and the repository exists. ' +
+        'Available public keys are: ' + str(keys)
+    )
 
 
 def _read_old_diffs(diff_dir, summary):
@@ -46,7 +48,7 @@ def _read_old_diffs(diff_dir, summary):
         diff = json.loads(diff_file.read())
 
         for action_key in diff:
-            summary[action_key] += sum([diff[action_key][key] for key in diff[action_key]])
+            summary[action_key] += sum(diff[action_key][key] for key in diff[action_key])
 
 
 
@@ -64,7 +66,7 @@ class Git:
         self._diffs_dir = os.path.join(db_task.get_task_artifacts_dirname(), "repos_diffs_v2")
         self._task_mode = db_task.mode
         self._task_name = re.sub(r'[\\/*?:"<>|\s]', '_', db_task.name)[:100]
-        self._branch_name = 'cvat_{}_{}'.format(db_task.id, self._task_name)
+        self._branch_name = f'cvat_{db_task.id}_{self._task_name}'
         self._annotation_file = os.path.join(self._cwd, self._path)
         self._sync_date = db_git.sync_date
         self._format = db_git.format
@@ -81,8 +83,13 @@ class Git:
             # https://github.com/git/git/blob/77bd3ea9f54f1584147b594abc04c26ca516d987/url.c
 
             host_pattern = r"((?:(?:(?:\d{1,3}\.){3}\d{1,3})|(?:[a-zA-Z0-9._-]+[.a-zA-Z]+))(?::\d+)?)"
-            http_pattern = r"(?:http[s]?://)?" + host_pattern + r"((?:/[a-zA-Z0-9._\-~]+){2,})"
-            ssh_pattern = r"(ssh://)?([a-zA-Z0-9._-]+)@" + host_pattern + r":([a-zA-Z0-9._-]+)((?:/[a-zA-Z0-9._\-~]+)+)"
+            http_pattern = (
+                f"(?:http[s]?://)?{host_pattern}" + r"((?:/[a-zA-Z0-9._\-~]+){2,})"
+            )
+            ssh_pattern = (
+                f"(ssh://)?([a-zA-Z0-9._-]+)@{host_pattern}"
+                + r":([a-zA-Z0-9._-]+)((?:/[a-zA-Z0-9._\-~]+)+)"
+            )
 
             http_match = re.match(http_pattern, self._url)
             ssh_match = re.match(ssh_pattern, self._url)
@@ -92,12 +99,16 @@ class Git:
             repos = None
 
             if http_match:
-                host = http_match.group(1)
-                repos = http_match.group(2)[1:]
+                host = http_match[1]
+                repos = http_match[2][1:]
             elif ssh_match:
-                user = ssh_match.group(1) + ssh_match.group(2) if ssh_match.group(1) is not None else ssh_match.group(2)
-                host = ssh_match.group(3)
-                repos = "{}{}".format(ssh_match.group(4), ssh_match.group(5))
+                user = (
+                    ssh_match[1] + ssh_match[2]
+                    if ssh_match[1] is not None
+                    else ssh_match[2]
+                )
+                host = ssh_match[3]
+                repos = f"{ssh_match[4]}{ssh_match[5]}"
             else:
                 raise Exception("Git repository URL does not satisfy pattern")
 
@@ -118,7 +129,9 @@ class Git:
         with open(readme_md_name, "w"):
             pass
         self._rep.index.add([readme_md_name])
-        self._rep.index.commit("CVAT Annotation. Initial commit by {} at {}".format(self._user["name"], timezone.now()))
+        self._rep.index.commit(
+            f'CVAT Annotation. Initial commit by {self._user["name"]} at {timezone.now()}'
+        )
 
         self._rep.git.push("origin", "master")
 
@@ -153,7 +166,7 @@ class Git:
 
     def _ssh_url(self):
         user, host, repos = self._parse_url()
-        return "{}@{}:{}".format(user, host, repos)
+        return f"{user}@{host}:{repos}"
 
 
     # Method clones a remote repos to the local storage using SSH and initializes it
@@ -162,7 +175,7 @@ class Git:
         ssh_url = self._ssh_url()
 
         # Cloning
-        slogger.task[self._tid].info("Cloning remote repository from {}..".format(ssh_url))
+        slogger.task[self._tid].info(f"Cloning remote repository from {ssh_url}..")
         self._rep = git.Repo.clone_from(ssh_url, self._cwd)
 
         # Initialization
@@ -269,8 +282,9 @@ class Git:
 
         # Dump an annotation
         timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        dump_name = os.path.join(db_task.get_dirname(),
-                                 "git_annotation_{}_{}.zip".format(self._format, timestamp))
+        dump_name = os.path.join(
+            db_task.get_dirname(), f"git_annotation_{self._format}_{timestamp}.zip"
+        )
 
         export_task(
             task_id=self._tid,
@@ -313,17 +327,15 @@ class Git:
                 for key in diff:
                     summary_diff[key] += diff[key]
 
-        message = "CVAT Annotation updated by {}. \n".format(self._user["name"])
-        message += 'Task URL: {}://{}/dashboard?id={}\n'.format(scheme, host, db_task.id)
-        if db_task.bug_tracker:
-            message += 'Bug Tracker URL: {}\n'.format(db_task.bug_tracker)
-        message += "Created: {}, updated: {}, deleted: {}\n".format(
-            summary_diff["create"],
-            summary_diff["update"],
-            summary_diff["delete"]
+        message = (
+            f'CVAT Annotation updated by {self._user["name"]}. \n'
+            + f'Task URL: {scheme}://{host}/dashboard?id={db_task.id}\n'
         )
-        message += "Annotation time: {} hours\n".format(math.ceil((last_save - self._sync_date).total_seconds() / 3600))
-        message += "Total annotation time: {} hours".format(math.ceil((last_save - db_task.created_date).total_seconds() / 3600))
+        if db_task.bug_tracker:
+            message += f'Bug Tracker URL: {db_task.bug_tracker}\n'
+        message += f'Created: {summary_diff["create"]}, updated: {summary_diff["update"]}, deleted: {summary_diff["delete"]}\n'
+        message += f"Annotation time: {math.ceil((last_save - self._sync_date).total_seconds() / 3600)} hours\n"
+        message += f"Total annotation time: {math.ceil((last_save - db_task.created_date).total_seconds() / 3600)} hours"
 
         self._rep.index.commit(message)
         self._rep.git.push("origin", self._branch_name, "--force")
@@ -335,23 +347,24 @@ class Git:
     # Method checks status of repository annotation
     def remote_status(self, last_save):
         # Check repository exists and archive exists
-        if not os.path.isfile(self._annotation_file) or last_save != self._sync_date:
+        if (
+            not os.path.isfile(self._annotation_file)
+            or last_save != self._sync_date
+        ):
             return GitStatusChoice.NON_SYNCED
-        else:
-            self._rep.git.update_ref('-d', 'refs/remotes/origin/{}'.format(self._branch_name))
-            self._rep.git.remote('-v', 'update')
+        self._rep.git.update_ref('-d', f'refs/remotes/origin/{self._branch_name}')
+        self._rep.git.remote('-v', 'update')
 
-            last_hash = self._rep.git.show_ref('refs/heads/{}'.format(self._branch_name), '--hash')
-            merge_base_hash = self._rep.merge_base('refs/remotes/origin/master', self._branch_name)[0].hexsha
-            if last_hash == merge_base_hash:
-                return GitStatusChoice.MERGED
-            else:
-                try:
-                    self._rep.git.show_ref('refs/remotes/origin/{}'.format(self._branch_name), '--hash')
-                    return GitStatusChoice.SYNCED
-                except git.exc.GitCommandError:
-                    # Remote branch has been deleted w/o merge
-                    return GitStatusChoice.NON_SYNCED
+        last_hash = self._rep.git.show_ref(f'refs/heads/{self._branch_name}', '--hash')
+        merge_base_hash = self._rep.merge_base('refs/remotes/origin/master', self._branch_name)[0].hexsha
+        if last_hash == merge_base_hash:
+            return GitStatusChoice.MERGED
+        try:
+            self._rep.git.show_ref(f'refs/remotes/origin/{self._branch_name}', '--hash')
+            return GitStatusChoice.SYNCED
+        except git.exc.GitCommandError:
+            # Remote branch has been deleted w/o merge
+            return GitStatusChoice.NON_SYNCED
 
 
 def initial_create(tid, git_path, export_format, lfs, user):
@@ -362,12 +375,12 @@ def initial_create(tid, git_path, export_format, lfs, user):
         path = None
 
         if path_search is not None:
-            path = path_search.group(1)
-            git_path = git_path[0:git_path.find(path) - 1].strip()
+            path = path_search[1]
+            git_path = git_path[:git_path.find(path) - 1].strip()
             path = os.path.join('/', path.strip())
         else:
             anno_file = re.sub(r'[\\/*?:"<>|\s]', '_', db_task.name)[:100]
-            path = '/annotation/{}.zip'.format(anno_file)
+            path = f'/annotation/{anno_file}.zip'
 
         path = path[1:]
         _split = os.path.splitext(path)
@@ -417,17 +430,18 @@ def push(tid, user, scheme, host):
 
 @transaction.atomic
 def get(tid, user):
-    response = {}
-    response["url"] = {"value": None}
-    response["status"] = {"value": None, "error": None}
-    response["format"] = {"format": None}
-    response["lfs"] = {"lfs": None}
+    response = {
+        "url": {"value": None},
+        "status": {"value": None, "error": None},
+        "format": {"format": None},
+        "lfs": {"lfs": None},
+    }
     db_task = Task.objects.get(pk = tid)
     if GitData.objects.filter(pk = db_task).exists():
         db_git = GitData.objects.select_for_update().get(pk = db_task)
-        response['url']['value'] = '{} [{}]'.format(db_git.url, db_git.path)
+        response['url']['value'] = f'{db_git.url} [{db_git.path}]'
         try:
-            rq_id = "git.push.{}".format(tid)
+            rq_id = f"git.push.{tid}"
             queue = django_rq.get_queue(settings.CVAT_QUEUES.EXPORT_DATA.value)
             rq_job = queue.fetch_job(rq_id)
             if rq_job is not None and (rq_job.is_queued or rq_job.is_started):
@@ -464,9 +478,10 @@ def update_states():
         try:
             get(db_git.task_id, db_user)
         except Exception:
-            slogger.glob.exception("Exception occurred during a status "
-                "updating for db_git with tid: {}".format(db_git.task_id),
-                exc_info=True)
+            slogger.glob.exception(
+                f"Exception occurred during a status updating for db_git with tid: {db_git.task_id}",
+                exc_info=True,
+            )
 
 @transaction.atomic
 def _onsave(jid, data, action):
@@ -488,7 +503,7 @@ def _onsave(jid, data, action):
 
         os.makedirs(diff_dir_v2, exist_ok = True)
 
-        summary[action] += sum([len(data[key]) for key in ['shapes', 'tracks', 'tags']])
+        summary[action] += sum(len(data[key]) for key in ['shapes', 'tracks', 'tags'])
 
         if summary["update"] or summary["create"] or summary["delete"]:
             diff_files = list(map(lambda x: os.path.join(diff_dir_v2, x), os.listdir(diff_dir_v2)))
@@ -498,7 +513,7 @@ def _onsave(jid, data, action):
                 number = int(number) if number.isdigit() else last_num
                 last_num = max(last_num, number)
 
-            with open(os.path.join(diff_dir_v2, "{}.diff".format(last_num + 1)), 'w') as f:
+            with open(os.path.join(diff_dir_v2, f"{last_num + 1}.diff"), 'w') as f:
                 f.write(json.dumps(summary))
 
             db_git.status = GitStatusChoice.NON_SYNCED

@@ -66,8 +66,7 @@ class WriteOnceMixin:
 
         if not isinstance(write_once_fields, (list, tuple)):
             raise TypeError(
-                'The `write_once_fields` option must be a list or tuple. '
-                'Got {}.'.format(type(write_once_fields).__name__)
+                f'The `write_once_fields` option must be a list or tuple. Got {type(write_once_fields).__name__}.'
             )
 
         for field_name in write_once_fields:
@@ -96,17 +95,16 @@ class HyperlinkedEndpointSerializer(serializers.Serializer):
         return instance
 
     def to_representation(self, instance):
-        request = self.context.get('request')
-        if not request:
+        if request := self.context.get('request'):
+            return serializers.Hyperlink(
+                reverse(self.view_name, request=request,
+                    query_params=build_field_filter_params(
+                        self.filter_key, getattr(instance, self.key_field)
+                )),
+                instance
+            )
+        else:
             return None
-
-        return serializers.Hyperlink(
-            reverse(self.view_name, request=request,
-                query_params=build_field_filter_params(
-                    self.filter_key, getattr(instance, self.key_field)
-            )),
-            instance
-        )
 
 
 class _CollectionSummarySerializer(serializers.Serializer):
@@ -130,7 +128,7 @@ class _CollectionSummarySerializer(serializers.Serializer):
     def get_fields(self):
         fields = super().get_fields()
         fields['url'] = HyperlinkedEndpointSerializer(self._model, filter_key=self._url_filter_key)
-        fields['count'].source = self._collection_key + '.count'
+        fields['count'].source = f'{self._collection_key}.count'
         return fields
 
     def get_attribute(self, instance):
@@ -164,13 +162,13 @@ class IssuesSummarySerializer(_CollectionSummarySerializer):
 class BasicUserSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if hasattr(self, 'initial_data'):
-            unknown_keys = set(self.initial_data.keys()) - set(self.fields.keys())
-            if unknown_keys:
-                if set(['is_staff', 'is_superuser', 'groups']) & unknown_keys:
-                    message = 'You do not have permissions to access some of' + \
-                        ' these fields: {}'.format(unknown_keys)
+            if unknown_keys := set(self.initial_data.keys()) - set(
+                self.fields.keys()
+            ):
+                if {'is_staff', 'is_superuser', 'groups'} & unknown_keys:
+                    message = f'You do not have permissions to access some of these fields: {unknown_keys}'
                 else:
-                    message = 'Got unknown fields: {}'.format(unknown_keys)
+                    message = f'Got unknown fields: {unknown_keys}'
                 raise serializers.ValidationError(message)
         return attrs
 
@@ -318,26 +316,21 @@ class LabelSerializer(SublabelSerializer):
                 db_label = models.Label.objects.get(id=validated_data['id'], **parent_info)
             except models.Label.DoesNotExist as exc:
                 raise exceptions.NotFound(
-                    detail='Not found label with id #{} to change'.format(validated_data['id'])
+                    detail=f"Not found label with id #{validated_data['id']} to change"
                 ) from exc
 
             updated_type = validated_data.get('type') or db_label.type
             if str(models.LabelType.SKELETON) in [db_label.type, updated_type]:
                 # do not permit changing types from/to skeleton
-                logger.warning("Label id {} ({}): an attempt to change label type from {} to {}. "
-                    "Changing from or to '{}' is not allowed, the type won't be changed.".format(
-                    db_label.id,
-                    db_label.name,
-                    db_label.type,
-                    updated_type,
-                    str(models.LabelType.SKELETON),
-                ))
+                logger.warning(
+                    f"Label id {db_label.id} ({db_label.name}): an attempt to change label type from {db_label.type} to {updated_type}. Changing from or to '{str(models.LabelType.SKELETON)}' is not allowed, the type won't be changed."
+                )
             else:
                 db_label.type = updated_type
 
             db_label.name = validated_data.get('name') or db_label.name
 
-            logger.info("Label id {} ({}) was updated".format(db_label.id, db_label.name))
+            logger.info(f"Label id {db_label.id} ({db_label.name}) was updated")
         else:
             try:
                 db_label = models.Label.create(
@@ -348,7 +341,7 @@ class LabelSerializer(SublabelSerializer):
                 )
             except models.InvalidLabel as exc:
                 raise exceptions.ValidationError(str(exc)) from exc
-            logger.info("New {} label was created".format(db_label.name))
+            logger.info(f"New {db_label.name} label was created")
 
             cls.update_labels(sublabels, parent_instance=parent_instance, parent_label=db_label)
 
@@ -387,11 +380,11 @@ class LabelSerializer(SublabelSerializer):
                 label=db_label, name=attr['name'], defaults=attr
             )
             if created:
-                logger.info("New {} attribute for {} label was created"
-                    .format(db_attr.name, db_label.name))
+                logger.info(
+                    f"New {db_attr.name} attribute for {db_label.name} label was created"
+                )
             else:
-                logger.info("{} attribute for {} label was updated"
-                    .format(db_attr.name, db_label.name))
+                logger.info(f"{db_attr.name} attribute for {db_label.name} label was updated")
 
                 # FIXME: need to update only "safe" fields
                 db_attr.default_value = attr.get('default_value', db_attr.default_value)
@@ -412,7 +405,7 @@ class LabelSerializer(SublabelSerializer):
     ):
         parent_info, logger = cls._get_parent_info(parent_instance)
 
-        label_colors = list()
+        label_colors = []
 
         for label in labels:
             attributes = label.pop('attributespec_set')
@@ -464,10 +457,13 @@ class LabelSerializer(SublabelSerializer):
         for label in labels:
             sublabels = label.pop('sublabels', [])
             svg = label.pop('svg', '')
-            db_label = cls.update_label(label, svg, sublabels,
-                parent_instance=parent_instance, parent_label=parent_label
-            )
-            if db_label:
+            if db_label := cls.update_label(
+                label,
+                svg,
+                sublabels,
+                parent_instance=parent_instance,
+                parent_label=parent_label,
+            ):
                 logger.info(
                     f'label:update Label id:{db_label.id} for spec:{label} '
                     f'with sublabels:{sublabels}, parent_label:{parent_label}'
@@ -553,8 +549,7 @@ class JobWriteSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         state = validated_data.get('state')
-        stage = validated_data.get('stage')
-        if stage:
+        if stage := validated_data.get('stage'):
             if stage == models.StageChoice.ANNOTATION:
                 status = models.StatusChoice.ANNOTATION
             elif stage == models.StageChoice.ACCEPTANCE and state == models.StateChoice.COMPLETED:
@@ -606,11 +601,10 @@ class ClientFileSerializer(serializers.ModelSerializer):
 
     # pylint: disable=no-self-use
     def to_representation(self, instance):
-        if instance:
-            upload_dir = instance.data.get_upload_dirname()
-            return instance.file.path[len(upload_dir) + 1:]
-        else:
+        if not instance:
             return instance
+        upload_dir = instance.data.get_upload_dirname()
+        return instance.file.path[len(upload_dir) + 1:]
 
 class ServerFileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -742,14 +736,14 @@ class DataSerializer(serializers.ModelSerializer):
 
     # pylint: disable=no-self-use
     def validate_frame_filter(self, value):
-        match = re.search(r"step\s*=\s*([1-9]\d*)", value)
-        if not match:
+        if match := re.search(r"step\s*=\s*([1-9]\d*)", value):
+            return value
+        else:
             raise serializers.ValidationError("Invalid frame filter expression")
-        return value
 
     # pylint: disable=no-self-use
     def validate_chunk_size(self, value):
-        if not value > 0:
+        if value <= 0:
             raise serializers.ValidationError('Chunk size must be a positive integer')
         return value
 
@@ -806,8 +800,11 @@ class DataSerializer(serializers.ModelSerializer):
         for extra_key in { 'use_zip_chunks', 'use_cache', 'copy_data' }:
             validated_data.pop(extra_key)
 
-        files = {'client_files': client_files, 'server_files': server_files, 'remote_files': remote_files}
-        return files
+        return {
+            'client_files': client_files,
+            'server_files': server_files,
+            'remote_files': remote_files,
+        }
 
 
     # pylint: disable=no-self-use
@@ -902,7 +899,9 @@ class TaskWriteSerializer(WriteOnceMixin, serializers.ModelSerializer):
                 raise serializers.ValidationError(f'The specified project #{project_id} does not exist.')
 
             if project.organization != validated_data.get('organization'):
-                raise serializers.ValidationError(f'The task and its project should be in the same organization.')
+                raise serializers.ValidationError(
+                    'The task and its project should be in the same organization.'
+                )
 
         labels = validated_data.pop('label_set', [])
 
@@ -1016,27 +1015,23 @@ class TaskWriteSerializer(WriteOnceMixin, serializers.ModelSerializer):
             for old_label in old_labels:
                 new_labels = tuple(filter(lambda x: x.get('id') == old_label.id, attrs.get('label_set', [])))
                 if len(new_labels):
-                    parent = new_labels[0].get('parent', old_label.parent)
-                    if parent:
+                    if parent := new_labels[0].get('parent', old_label.parent):
                         if parent.name not in new_sublabel_names:
                             new_sublabel_names[parent.name] = set()
                         new_sublabel_names[parent.name].add(new_labels[0].get('name', old_label.name))
                     else:
                         new_label_names.add(new_labels[0].get('name', old_label.name))
+                elif parent := old_label.parent:
+                    if parent.name not in new_sublabel_names:
+                        new_sublabel_names[parent.name] = set()
+                    new_sublabel_names[parent.name].add(old_label.name)
                 else:
-                    parent = old_label.parent
-                    if parent:
-                        if parent.name not in new_sublabel_names:
-                            new_sublabel_names[parent.name] = set()
-                        new_sublabel_names[parent.name].add(old_label.name)
-                    else:
-                        new_label_names.add(old_label.name)
+                    new_label_names.add(old_label.name)
             target_project = models.Project.objects.get(id=project_id)
             target_project_label_names = set()
             target_project_sublabel_names = {}
             for label in target_project.label_set.all():
-                parent = label.parent
-                if parent:
+                if parent := label.parent:
                     if parent.name not in target_project_sublabel_names:
                         target_project_sublabel_names[parent.name] = set()
                     target_project_sublabel_names[parent.name].add(label.name)
@@ -1523,15 +1518,18 @@ class CloudStorageWriteSerializer(serializers.ModelSerializer):
         if value:
             attributes = value.split('&')
             for attribute in attributes:
-                if not len(attribute.split('=')) == 2:
+                if len(attribute.split('=')) != 2:
                     raise serializers.ValidationError('Invalid specific attributes')
         return value
 
     def validate(self, attrs):
         provider_type = attrs.get('provider_type')
-        if provider_type == models.CloudProviderChoice.AZURE_CONTAINER:
-            if not attrs.get('account_name', '') and not attrs.get('connection_string', ''):
-                raise serializers.ValidationError('Account name or connection string for Azure container was not specified')
+        if (
+            provider_type == models.CloudProviderChoice.AZURE_CONTAINER
+            and not attrs.get('account_name', '')
+            and not attrs.get('connection_string', '')
+        ):
+            raise serializers.ValidationError('Account name or connection string for Azure container was not specified')
         return attrs
 
     @staticmethod
@@ -1540,15 +1538,17 @@ class CloudStorageWriteSerializer(serializers.ModelSerializer):
         for manifest in manifests:
             file_status = storage.get_file_status(manifest)
             if file_status == Status.NOT_FOUND:
-                raise serializers.ValidationError({
-                    'manifests': "The '{}' file does not exist on '{}' cloud storage" \
-                        .format(manifest, storage.name)
-                })
+                raise serializers.ValidationError(
+                    {
+                        'manifests': f"The '{manifest}' file does not exist on '{storage.name}' cloud storage"
+                    }
+                )
             elif file_status == Status.FORBIDDEN:
-                raise serializers.ValidationError({
-                    'manifests': "The '{}' file does not available on '{}' cloud storage. Access denied" \
-                        .format(manifest, storage.name)
-                })
+                raise serializers.ValidationError(
+                    {
+                        'manifests': f"The '{manifest}' file does not available on '{storage.name}' cloud storage. Access denied"
+                    }
+                )
 
     def create(self, validated_data):
         provider_type = validated_data.get('provider_type')
@@ -1582,7 +1582,7 @@ class CloudStorageWriteSerializer(serializers.ModelSerializer):
             try:
                 storage.create()
             except Exception as ex:
-                slogger.glob.warning("Failed with creating storage\n{}".format(str(ex)))
+                slogger.glob.warning(f"Failed with creating storage\n{str(ex)}")
                 raise
 
         storage_status = storage.get_status()
@@ -1616,10 +1616,10 @@ class CloudStorageWriteSerializer(serializers.ModelSerializer):
             return db_storage
         elif storage_status == Status.FORBIDDEN:
             field = 'credentials'
-            message = 'Cannot create resource {} with specified credentials. Access forbidden.'.format(storage.name)
+            message = f'Cannot create resource {storage.name} with specified credentials. Access forbidden.'
         else:
             field = 'resource'
-            message = 'The resource {} not found. It may have been deleted.'.format(storage.name)
+            message = f'The resource {storage.name} not found. It may have been deleted.'
         if temporary_file:
             os.remove(temporary_file)
         slogger.glob.error(message)
@@ -1664,8 +1664,10 @@ class CloudStorageWriteSerializer(serializers.ModelSerializer):
         storage = get_cloud_storage_instance(cloud_provider=instance.provider_type, **details)
         storage_status = storage.get_status()
         if storage_status == Status.AVAILABLE:
-            new_manifest_names = set(i.get('filename') for i in validated_data.get('manifests', []))
-            previos_manifest_names = set(i.filename for i in instance.manifests.all())
+            new_manifest_names = {
+                i.get('filename') for i in validated_data.get('manifests', [])
+            }
+            previos_manifest_names = {i.filename for i in instance.manifests.all()}
             delta_to_delete = tuple(previos_manifest_names - new_manifest_names)
             delta_to_create = tuple(new_manifest_names - previos_manifest_names)
             if delta_to_delete:
@@ -1686,10 +1688,10 @@ class CloudStorageWriteSerializer(serializers.ModelSerializer):
             return instance
         elif storage_status == Status.FORBIDDEN:
             field = 'credentials'
-            message = 'Cannot update resource {} with specified credentials. Access forbidden.'.format(storage.name)
+            message = f'Cannot update resource {storage.name} with specified credentials. Access forbidden.'
         else:
             field = 'resource'
-            message = 'The resource {} not found. It may have been deleted.'.format(storage.name)
+            message = f'The resource {storage.name} not found. It may have been deleted.'
         if temporary_file:
             os.remove(temporary_file)
         slogger.glob.error(message)
@@ -1710,8 +1712,7 @@ def _update_related_storages(instance, validated_data):
         if not new_conf:
             continue
 
-        cloud_storage_id = new_conf.get('cloud_storage_id')
-        if cloud_storage_id:
+        if cloud_storage_id := new_conf.get('cloud_storage_id'):
             _validate_existence_of_cloud_storage(cloud_storage_id)
 
         # storage_instance maybe None
@@ -1727,8 +1728,7 @@ def _update_related_storages(instance, validated_data):
         storage_instance.cloud_storage_id = new_conf.get('cloud_storage_id', \
             storage_instance.cloud_storage_id if not new_location else None)
 
-        cloud_storage_id = storage_instance.cloud_storage_id
-        if cloud_storage_id:
+        if cloud_storage_id := storage_instance.cloud_storage_id:
             try:
                 _ = models.CloudStorage.objects.get(id=cloud_storage_id)
             except models.CloudStorage.DoesNotExist:
@@ -1744,10 +1744,8 @@ def _configure_related_storages(validated_data):
     }
 
     for i in storages:
-        storage_conf = validated_data.get(i)
-        if storage_conf:
-            cloud_storage_id = storage_conf.get('cloud_storage_id')
-            if cloud_storage_id:
+        if storage_conf := validated_data.get(i):
+            if cloud_storage_id := storage_conf.get('cloud_storage_id'):
                 _validate_existence_of_cloud_storage(cloud_storage_id)
             storage_instance = models.Storage(**storage_conf)
             storage_instance.save()

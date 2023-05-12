@@ -11,11 +11,7 @@ def _prepare_objects_to_delete(object_to_delete):
     related_field_names = ('task_set', 'segment_set', 'job_set', 'issues', 'comments')
     field_names = tuple(m._meta.model_name for m in relation_chain)
 
-    # Find object Model
-    index = relation_chain.index(object_to_delete.__class__)
-
-    # Need to prefetch 'next' Model objects in the chain
-    index += 1
+    index = relation_chain.index(object_to_delete.__class__) + 1
     if index >= len(relation_chain):
         return []
 

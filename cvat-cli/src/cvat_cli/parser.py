@@ -26,11 +26,10 @@ def get_auth(s):
 
 def parse_label_arg(s):
     """If s is a file load it as JSON, otherwise parse s as JSON."""
-    if os.path.exists(s):
-        with open(s, "r") as fp:
-            return json.load(fp)
-    else:
+    if not os.path.exists(s):
         return json.loads(s)
+    with open(s, "r") as fp:
+        return json.load(fp)
 
 
 def parse_resource_type(s: str) -> ResourceType:

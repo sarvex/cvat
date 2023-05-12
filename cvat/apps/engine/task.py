@@ -170,7 +170,7 @@ def _count_files(data):
             raise ValueError("Don't use '..' inside file paths")
         full_path = os.path.abspath(os.path.join(share_root, path))
         if os.path.commonprefix([share_root, full_path]) != share_root:
-            raise ValueError("Bad file path: " + path)
+            raise ValueError(f"Bad file path: {path}")
         server_files.append(path)
 
     sorted_server_files = sorted(server_files, reverse=True)
@@ -232,7 +232,7 @@ def _validate_data(counter, manifest_files=None):
     if unique_entries == 1 and multiple_entries > 0 or unique_entries > 1:
         unique_types = ', '.join([k for k, v in MEDIA_TYPES.items() if v['unique']])
         multiply_types = ', '.join([k for k, v in MEDIA_TYPES.items() if not v['unique']])
-        count = ', '.join(['{} {}(s)'.format(len(v), k) for k, v in counter.items()])
+        count = ', '.join([f'{len(v)} {k}(s)' for k, v in counter.items()])
         raise ValueError('Only one {} or many {} can be used simultaneously, \
             but {} found.'.format(unique_types, multiply_types, count))
 
@@ -241,7 +241,7 @@ def _validate_data(counter, manifest_files=None):
 
     task_modes = [MEDIA_TYPES[media_type]['mode'] for media_type, media_files in counter.items() if media_files]
 
-    if not all(mode == task_modes[0] for mode in task_modes):
+    if any(mode != task_modes[0] for mode in task_modes):
         raise Exception('Could not combine different task modes for data')
 
     return counter, task_modes[0]
@@ -348,20 +348,19 @@ def _download_data(urls, upload_dir):
         for url in urls:
             name = os.path.basename(urlrequest.url2pathname(urlparse.urlparse(url).path))
             if name in local_files:
-                raise Exception("filename collision: {}".format(name))
+                raise Exception(f"filename collision: {name}")
             _validate_url(url)
-            slogger.glob.info("Downloading: {}".format(url))
-            job.meta['status'] = '{} is being downloaded..'.format(url)
+            slogger.glob.info(f"Downloading: {url}")
+            job.meta['status'] = f'{url} is being downloaded..'
             job.save_meta()
 
             response = session.get(url, stream=True)
-            if response.status_code == 200:
-                response.raw.decode_content = True
-                with open(os.path.join(upload_dir, name), 'wb') as output_file:
-                    shutil.copyfileobj(response.raw, output_file)
-            else:
-                raise Exception("Failed to download " + url)
+            if response.status_code != 200:
+                raise Exception(f"Failed to download {url}")
 
+            response.raw.decode_content = True
+            with open(os.path.join(upload_dir, name), 'wb') as output_file:
+                shutil.copyfileobj(response.raw, output_file)
             local_files[name] = True
 
     return list(local_files.keys())

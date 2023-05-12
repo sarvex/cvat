@@ -25,20 +25,13 @@ def get_location_configuration(obj, field_name: str, use_settings: bool = False)
             location_conf['location'] = Location.LOCAL
         else:
             location_conf['location'] = storage.location
-            sid = storage.cloud_storage_id
-            if sid:
+            if sid := storage.cloud_storage_id:
                 location_conf['storage_id'] = sid
     else:
         # obj is query_params
         # FIXME when ui part will be done
         location_conf['location'] = obj.get('location', Location.LOCAL)
-        # try:
-        #     location_conf['location'] = obj['location']
-        # except KeyError:
-        #     raise ValidationError("Custom settings were selected but no location was specified")
-
-        sid = obj.get('cloud_storage_id')
-        if sid:
+        if sid := obj.get('cloud_storage_id'):
             location_conf['storage_id'] = int(sid)
 
     return location_conf

@@ -46,9 +46,7 @@ def project_id(instance):
 
     try:
         pid = getattr(instance, "project_id", None)
-        if pid is None:
-            return instance.get_project_id()
-        return pid
+        return instance.get_project_id() if pid is None else pid
     except Exception:
         return None
 
@@ -59,9 +57,7 @@ def organization_id(instance):
 
     try:
         oid = getattr(instance, "organization_id", None)
-        if oid is None:
-            return instance.get_organization_id()
-        return oid
+        return instance.get_organization_id() if oid is None else oid
     except Exception:
         return None
 
@@ -72,9 +68,7 @@ def task_id(instance):
 
     try:
         tid = getattr(instance, "task_id", None)
-        if tid is None:
-            return instance.get_task_id()
-        return tid
+        return instance.get_task_id() if tid is None else tid
     except Exception:
         return None
 
@@ -84,9 +78,7 @@ def job_id(instance):
 
     try:
         jid = getattr(instance, "job_id", None)
-        if jid is None:
-            return instance.get_job_id()
-        return jid
+        return instance.get_job_id() if jid is None else jid
     except Exception:
         return None
 
@@ -96,18 +88,12 @@ def get_user(instance=None):
     if user is not None:
         return user
 
-    # Try to get user from rq_job
     if isinstance(instance, rq.job.Job):
         return instance.meta.get("user", None)
-    else:
-        rq_job = rq.get_current_job()
-        if rq_job:
-            return rq_job.meta.get("user", None)
+    if rq_job := rq.get_current_job():
+        return rq_job.meta.get("user", None)
 
-    if isinstance(instance, User):
-        return instance
-
-    return None
+    return instance if isinstance(instance, User) else None
 
 def get_request(instance=None):
     request = get_current_request()
@@ -116,19 +102,14 @@ def get_request(instance=None):
 
     if isinstance(instance, rq.job.Job):
         return instance.meta.get("request", None)
-    else:
-        rq_job = rq.get_current_job()
-        if rq_job:
-            return rq_job.meta.get("request", None)
+    if rq_job := rq.get_current_job():
+        return rq_job.meta.get("request", None)
 
     return None
 
 def _get_value(obj, key):
     if obj is not None:
-        if isinstance(obj, dict):
-            return obj.get(key, None)
-        return getattr(obj, key, None)
-
+        return obj.get(key, None) if isinstance(obj, dict) else getattr(obj, key, None)
     return None
 
 def request_id(instance=None):
@@ -153,9 +134,7 @@ def organization_slug(instance):
 
     try:
         org = getattr(instance, "organization", None)
-        if org is None:
-            return instance.get_organization_slug()
-        return org.slug
+        return instance.get_organization_slug() if org is None else org.slug
     except Exception:
         return None
 
@@ -200,22 +179,16 @@ def _cleanup_fields(obj):
         "url",
     )
 
-    data = {}
-    for k, v in obj.items():
-        if k in fields:
-            continue
-        if isinstance(v, dict):
-            data[k] = {kk: vv for kk, vv in v.items() if kk not in subfields}
-        else:
-            data[k] = v
-    return data
+    return {
+        k: {kk: vv for kk, vv in v.items() if kk not in subfields}
+        if isinstance(v, dict)
+        else v
+        for k, v in obj.items()
+        if k not in fields
+    }
 
 def _get_object_name(instance):
-    if isinstance(instance, Organization) or \
-        isinstance(instance, Project) or \
-        isinstance(instance, Task) or \
-        isinstance(instance, Job) or \
-        isinstance(instance, Label):
+    if isinstance(instance, (Organization, Project, Task, Job, Label)):
         return getattr(instance, "name", None)
 
     if isinstance(instance, User):
@@ -368,8 +341,9 @@ def handle_delete(scope, instance, store_in_deletion_cache=False, **kwargs):
         )
         return
 
-    instance_meta_info = deletion_cache.pop(instance.__class__, instance.id)
-    if instance_meta_info:
+    if instance_meta_info := deletion_cache.pop(
+        instance.__class__, instance.id
+    ):
         oid = instance_meta_info["oid"]
         oslug = instance_meta_info["oslug"]
         pid = instance_meta_info["pid"]

@@ -187,7 +187,7 @@ class Client:
 
         assert "sessionid" in self.api_client.cookies
         assert "csrftoken" in self.api_client.cookies
-        self.api_client.set_default_header("Authorization", "Token " + auth.key)
+        self.api_client.set_default_header("Authorization", f"Token {auth.key}")
 
     def has_credentials(self) -> bool:
         return (
@@ -316,17 +316,17 @@ class CVAT_API_V2:
 
     def __init__(self, host: str):
         self.host = host.rstrip("/")
-        self.base = self.host + "/api/"
-        self.git = self.host + "/git/repository/"
+        self.base = f"{self.host}/api/"
+        self.git = f"{self.host}/git/repository/"
 
     def git_create(self, task_id: int) -> str:
-        return self.git + f"create/{task_id}"
+        return f"{self.git}create/{task_id}"
 
     def git_check(self, rq_id: int) -> str:
-        return self.git + f"check/{rq_id}"
+        return f"{self.git}check/{rq_id}"
 
     def git_get(self, task_id: int) -> str:
-        return self.git + f"get/{task_id}"
+        return f"{self.git}get/{task_id}"
 
     def make_endpoint_url(
         self,
@@ -340,7 +340,7 @@ class CVAT_API_V2:
         if psub or kwsub:
             url = url.format(*(psub or []), **(kwsub or {}))
         if query_params:
-            url += "?" + urllib.parse.urlencode(query_params)
+            url += f"?{urllib.parse.urlencode(query_params)}"
         return url
 
 

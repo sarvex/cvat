@@ -59,21 +59,23 @@ def make_paginated_response(
     return response_type(serializer.data)
 
 def list_action(serializer_class: Type[Serializer], **kwargs):
-    params = dict(
-        detail=True,
-        methods=["GET"],
-        serializer_class=serializer_class,
-
-        # Restore the default pagination
-        pagination_class=GenericViewSet.pagination_class,
-
-        # Remove the regular list() parameters from the swagger schema.
-        # Unset, they would be taken from the enclosing class, which is wrong.
-        # https://drf-spectacular.readthedocs.io/en/latest/faq.html#my-action-is-erroneously-paginated-or-has-filter-parameters-that-i-do-not-want
-        filter_fields=None, search_fields=None, ordering_fields=None, simple_filters=None
+    params = (
+        dict(
+            detail=True,
+            methods=["GET"],
+            serializer_class=serializer_class,
+            # Restore the default pagination
+            pagination_class=GenericViewSet.pagination_class,
+            # Remove the regular list() parameters from the swagger schema.
+            # Unset, they would be taken from the enclosing class, which is wrong.
+            # https://drf-spectacular.readthedocs.io/en/latest/faq.html#my-action-is-erroneously-paginated-or-has-filter-parameters-that-i-do-not-want
+            filter_fields=None,
+            search_fields=None,
+            ordering_fields=None,
+            simple_filters=None,
+        )
+        | kwargs
     )
-    params.update(kwargs)
-
     return action(**params)
 
 def get_cloud_storage_for_import_or_export(
@@ -82,12 +84,11 @@ def get_cloud_storage_for_import_or_export(
     perm = CloudStoragePermission.create_scope_view(request=request, storage_id=storage_id)
     result = perm.check_access()
     if not result.allow:
-        if is_default:
-            # In this case, the user did not specify the location explicitly
-            error_message = "A cloud storage is selected as the default location. "
-        else:
-            error_message = ""
-        error_message += "You don't have access to this cloud storage"
+        error_message = (
+            "A cloud storage is selected as the default location. "
+            if is_default
+            else ""
+        ) + "You don't have access to this cloud storage"
         raise PermissionDenied(error_message)
 
     return get_object_or_404(CloudStorageModel, pk=storage_id)

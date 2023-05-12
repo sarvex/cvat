@@ -42,7 +42,7 @@ class CustomCacheBackend(BaseHealthCheckBackend):
             cache = caches[self.backend]
 
             cache.set("djangohealtcheck_test", "itworks")
-            if not cache.get("djangohealtcheck_test") == "itworks":
+            if cache.get("djangohealtcheck_test") != "itworks":
                 raise ServiceUnavailable("Cache key does not match")
         except CacheKeyWarning as e:
             self.add_error(ServiceReturnedUnexpectedResult("Cache key warning"), e)
@@ -51,4 +51,4 @@ class CustomCacheBackend(BaseHealthCheckBackend):
         except ConnectionError as e:
             self.add_error(ServiceReturnedUnexpectedResult("Connection Error"), e)
         except sqlite3.DatabaseError as e:
-            raise ServiceUnavailable("Cache error: {}".format(str(e)))
+            raise ServiceUnavailable(f"Cache error: {str(e)}")

@@ -19,16 +19,15 @@ MIGRATION_LOG = os.path.join(settings.MIGRATIONS_LOGS_ROOT, f"{MIGRATION_NAME}.l
 
 def _get_query_set(apps):
     Data = apps.get_model("engine", "Data")
-    query_set = Data.objects.filter(storage_method=StorageMethodChoice.CACHE)
-    return query_set
+    return Data.objects.filter(storage_method=StorageMethodChoice.CACHE)
 
 def migrate2meta(apps, shema_editor):
     logger = get_logger(MIGRATION_NAME, MIGRATION_LOG)
     query_set = _get_query_set(apps)
     for db_data in query_set:
         try:
-            upload_dir = '{}/{}/raw'.format(settings.MEDIA_DATA_ROOT, db_data.id)
-            logger.info('Migrate data({}), folder - {}'.format(db_data.id, upload_dir))
+            upload_dir = f'{settings.MEDIA_DATA_ROOT}/{db_data.id}/raw'
+            logger.info(f'Migrate data({db_data.id}), folder - {upload_dir}')
             meta_path = os.path.join(upload_dir, "meta_info.txt")
             if os.path.exists(os.path.join(upload_dir, 'manifest.jsonl')):
                 os.remove(os.path.join(upload_dir, 'manifest.jsonl'))
@@ -56,11 +55,11 @@ def migrate2meta(apps, shema_editor):
                 logger.info('Preparing of the dummy chunks has begun')
                 for idx, img_paths in itertools.groupby(sources, lambda x: next(counter) // db_data.chunk_size):
                     if os.path.exists(os.path.join(upload_dir, name_format.format(idx))):
-                        logger.info(name_format.format(idx) + " already exists")
+                        logger.info(f"{name_format.format(idx)} already exists")
                         continue
                     with open(os.path.join(upload_dir, name_format.format(idx)), "w") as dummy_chunk:
                         dummy_chunk.writelines([f"{img_path}\n" for img_path in img_paths])
-            logger.info('Succesfull migration for the data({})'.format(db_data.id))
+            logger.info(f'Succesfull migration for the data({db_data.id})')
         except Exception as ex:
             logger.error(str(ex))
 
@@ -111,7 +110,8 @@ def migrate2manifest(apps, shema_editor):
                 if db_data.storage == StorageChoice.SHARE:
                     def _get_frame_step(str_):
                         match = search("step\s*=\s*([1-9]\d*)", str_)
-                        return int(match.group(1)) if match else 1
+                        return int(match[1]) if match else 1
+
                     logger.info('Data is located on the share, metadata update has been started')
                     manifest.step = _get_frame_step(db_data.frame_filter)
                     manifest.start = db_data.start_frame

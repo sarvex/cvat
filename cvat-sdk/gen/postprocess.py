@@ -47,7 +47,7 @@ class Replacer:
         assert tokenized_path[0] == "" and tokenized_path[1] == "api"
         tokenized_path = tokenized_path[2:]
 
-        prefix = tokenized_path[0] + "_"
+        prefix = f"{tokenized_path[0]}_"
         if new_name.startswith(prefix) and tokenized_path[0] in operation["tags"]:
             new_name = new_name[len(prefix) :]
 
@@ -64,10 +64,7 @@ class Replacer:
         ANY_pattern = "bool, date, datetime, dict, float, int, list, str"
         type_repr = type_repr.replace(ANY_pattern, "typing.Any")
 
-        # single optional arg pattern
-        type_repr = re.sub(r"^(.+, none_type)$", r"typing.Union[\1]", type_repr)
-
-        return type_repr
+        return re.sub(r"^(.+, none_type)$", r"typing.Union[\1]", type_repr)
 
     allowed_actions = {
         "make_operation_id",
@@ -103,7 +100,7 @@ class Replacer:
             f.write(contents)
 
     def process_dir(self, dir_path: str, *, file_ext: str = ".py"):
-        for filename in glob(dir_path + f"/**/*{file_ext}", recursive=True):
+        for filename in glob(f"{dir_path}/**/*{file_ext}", recursive=True):
             try:
                 self.process_file(filename)
             except Exception as e:

@@ -30,28 +30,25 @@ def fix_path(path):
 
 def get_frame_step(frame_filter):
     match = re.search(r"step\s*=\s*([1-9]\d*)", frame_filter)
-    return int(match.group(1)) if match else 1
+    return int(match[1]) if match else 1
 
 def get_task_on_disk():
     folders = [os.path.relpath(f, settings.DATA_ROOT)
         for f in glob.glob(os.path.join(settings.DATA_ROOT, '*'), recursive=False)]
 
-    return set(int(f) for f in folders if f.isdigit())
+    return {int(f) for f in folders if f.isdigit()}
 
 def get_frame_path(task_data_dir, frame):
     d1 = str(int(frame) // 10000)
     d2 = str(int(frame) // 100)
-    path = os.path.join(task_data_dir, d1, d2,
-        str(frame) + '.jpg')
+    path = os.path.join(task_data_dir, d1, d2, f'{str(frame)}.jpg')
 
     return path
 
 def slice_by_size(frames, size):
     it = itertools.islice(frames, 0, None)
-    frames = list(itertools.islice(it, 0, size , 1))
-    while frames:
+    while frames := list(itertools.islice(it, 0, size, 1)):
         yield frames
-        frames = list(itertools.islice(it, 0, size, 1))
 
 def migrate_task_data(db_task_id, db_data_id, original_video, original_images, size, start_frame,
     stop_frame, frame_filter, image_quality, chunk_size, return_dict):
@@ -73,10 +70,10 @@ def migrate_task_data(db_task_id, db_data_id, original_video, original_images, s
                     generator = itertools.groupby(reader, lambda x: next(counter) // chunk_size)
                     for chunk_idx, chunk_images in generator:
                         chunk_images = list(chunk_images)
-                        original_chunk_path = os.path.join(original_cache_dir, '{}.mp4'.format(chunk_idx))
+                        original_chunk_path = os.path.join(original_cache_dir, f'{chunk_idx}.mp4')
                         original_chunk_writer.save_as_chunk(chunk_images, original_chunk_path)
 
-                        compressed_chunk_path = os.path.join(compressed_cache_dir, '{}.zip'.format(chunk_idx))
+                        compressed_chunk_path = os.path.join(compressed_cache_dir, f'{chunk_idx}.zip')
                         compressed_chunk_writer.save_as_chunk(chunk_images, compressed_chunk_path)
 
                     preview = reader.get_preview()
@@ -89,10 +86,10 @@ def migrate_task_data(db_task_id, db_data_id, original_video, original_images, s
                             image_path = get_frame_path(old_task_data_dir, image_id)
                             chunk_images.append((image_path, image_path))
 
-                        original_chunk_path = os.path.join(original_cache_dir, '{}.zip'.format(chunk_idx))
+                        original_chunk_path = os.path.join(original_cache_dir, f'{chunk_idx}.zip')
                         original_chunk_writer.save_as_chunk(chunk_images, original_chunk_path)
 
-                        compressed_chunk_path = os.path.join(compressed_cache_dir, '{}.zip'.format(chunk_idx))
+                        compressed_chunk_path = os.path.join(compressed_cache_dir, f'{chunk_idx}.zip')
                         os.symlink(original_chunk_path, compressed_chunk_path)
                         shutil.copyfile(get_frame_path(old_task_data_dir, image_id), os.path.join(db_data_dir, 'preview.jpeg'))
             else:
@@ -126,10 +123,10 @@ def migrate_task_data(db_task_id, db_data_id, original_video, original_images, s
                             image_path = get_frame_path(old_task_data_dir, image_id)
                             chunk_images.append((image_path, image_path))
 
-                        original_chunk_path = os.path.join(original_cache_dir, '{}.zip'.format(chunk_idx))
+                        original_chunk_path = os.path.join(original_cache_dir, f'{chunk_idx}.zip')
                         original_chunk_writer.save_as_chunk(chunk_images, original_chunk_path)
 
-                        compressed_chunk_path = os.path.join(compressed_cache_dir, '{}.zip'.format(chunk_idx))
+                        compressed_chunk_path = os.path.join(compressed_cache_dir, f'{chunk_idx}.zip')
                         os.symlink(original_chunk_path, compressed_chunk_path)
                         shutil.copyfile(get_frame_path(old_task_data_dir, image_id), os.path.join(db_data_dir, 'preview.jpeg'))
                 else:
@@ -140,10 +137,10 @@ def migrate_task_data(db_task_id, db_data_id, original_video, original_images, s
                     generator = itertools.groupby(reader, lambda x: next(counter) // chunk_size)
                     for chunk_idx, chunk_images in generator:
                         chunk_images = list(chunk_images)
-                        compressed_chunk_path = os.path.join(compressed_cache_dir, '{}.zip'.format(chunk_idx))
+                        compressed_chunk_path = os.path.join(compressed_cache_dir, f'{chunk_idx}.zip')
                         compressed_chunk_writer.save_as_chunk(chunk_images, compressed_chunk_path)
 
-                        original_chunk_path = os.path.join(original_cache_dir, '{}.zip'.format(chunk_idx))
+                        original_chunk_path = os.path.join(original_cache_dir, f'{chunk_idx}.zip')
                         original_chunk_writer.save_as_chunk(chunk_images, original_chunk_path)
 
                     preview = reader.get_preview()
@@ -156,7 +153,7 @@ def migrate_task_data(db_task_id, db_data_id, original_video, original_images, s
     return 0
 
 def migrate_task_schema(db_task, Data, log):
-    log.info('Start schema migration of task ID {}.'.format(db_task.id))
+    log.info(f'Start schema migration of task ID {db_task.id}.')
     try:
         # create folders
         new_task_dir = os.path.join(settings.TASKS_ROOT, str(db_task.id))
@@ -229,7 +226,7 @@ def migrate_task_schema(db_task, Data, log):
         return (db_task.id, db_data.id)
 
     except Exception as e:
-        log.error('Cannot migrate schema for the task: {}'.format(db_task.id))
+        log.error(f'Cannot migrate schema for the task: {db_task.id}')
         log.error(str(e))
         traceback.print_exc(file=sys.stderr)
 
@@ -301,7 +298,7 @@ def create_data_objects(apps, schema_editor):
                 results[migrated_db_tasks[task_idx][0]].start()
                 task_idx += 1
 
-            if len(results) == 0:
+            if not results:
                 break
 
             time.sleep(5)

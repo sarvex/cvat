@@ -90,41 +90,24 @@ class _LambdaTestCaseBase(APITestCase):
         url = kwargs["url"]
         if url == "/api/functions":
             return functions["positive"]
-        else:
-            func_id = url.split("/")[-1]
-            if func_id in functions["positive"]:
-                if func_id in [id_function_state_building, id_function_state_error]:
-                    r = requests.RequestException()
-                    r.response = HttpResponseServerError()
-                    raise r # raise 500 Internal_Server error
+        func_id = url.split("/")[-1]
+        if func_id in functions["positive"]:
+            if func_id in [id_function_state_building, id_function_state_error]:
+                r = requests.RequestException()
+                r.response = HttpResponseServerError()
+                raise r # raise 500 Internal_Server error
 
-                return functions["positive"][func_id]
-            else:
-                r = requests.HTTPError()
-                r.response = HttpResponseNotFound()
-                raise r # raise 404 Not Found error
+            return functions["positive"][func_id]
+        else:
+            r = requests.HTTPError()
+            r.response = HttpResponseNotFound()
+            raise r # raise 404 Not Found error
 
     def __invoke_function(self, func, payload):
         data = []
         func_id = func.id
         type_function = functions["positive"][func_id]["metadata"]["annotations"]["type"]
-        if type_function == "reid":
-            if func_id == id_function_reid_response_data:
-                data = [0, 1]
-            else:
-                data = []
-        elif type_function == "tracker":
-            data = {
-                "shape": [12.34, 34.0, 35.01, 41.99],
-                "state": {"key": "value"},
-            }
-        elif type_function == "interactor":
-            data = [
-                [8, 12],
-                [34, 56],
-                [77, 77],
-            ]
-        elif type_function == "detector":
+        if type_function == "detector":
             data = [
                 {
                     "confidence": "0.9959098",
@@ -152,6 +135,19 @@ class _LambdaTestCaseBase(APITestCase):
                 },
             ]
 
+        elif type_function == "interactor":
+            data = [
+                [8, 12],
+                [34, 56],
+                [77, 77],
+            ]
+        elif type_function == "reid":
+            data = [0, 1] if func_id == id_function_reid_response_data else []
+        elif type_function == "tracker":
+            data = {
+                "shape": [12.34, 34.0, 35.01, 41.99],
+                "state": {"key": "value"},
+            }
         return data
 
     @classmethod
@@ -177,13 +173,17 @@ class _LambdaTestCaseBase(APITestCase):
             assert response.status_code == status.HTTP_201_CREATED, response.status_code
             tid = response.data["id"]
 
-            response = self.client.post("/api/tasks/%s/data" % tid,
+            response = self.client.post(
+                f"/api/tasks/{tid}/data",
                 data=image_data,
-                QUERY_STRING=f'org_id={org_id}' if org_id is not None else None)
+                QUERY_STRING=f'org_id={org_id}' if org_id is not None else None,
+            )
             assert response.status_code == status.HTTP_202_ACCEPTED, response.status_code
 
-            response = self.client.get("/api/tasks/%s" % tid,
-                QUERY_STRING=f'org_id={org_id}' if org_id is not None else None)
+            response = self.client.get(
+                f"/api/tasks/{tid}",
+                QUERY_STRING=f'org_id={org_id}' if org_id is not None else None,
+            )
             task = response.data
 
         return task
@@ -893,7 +893,7 @@ class LambdaTestCases(_LambdaTestCaseBase):
         id_request = response.data["id"]
 
         request_status = "started"
-        while request_status != "finished" and request_status != "failed":
+        while request_status not in ["finished", "failed"]:
             response = self._get_request(f'{LAMBDA_REQUESTS_PATH}/{id_request}', self.admin)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             request_status = response.json().get("status")

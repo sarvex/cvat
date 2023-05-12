@@ -11,8 +11,7 @@ MIGRATION_LOG = os.path.join(settings.MIGRATIONS_LOGS_ROOT, f"{MIGRATION_NAME}.l
 
 def _get_query_set(apps):
     Job = apps.get_model("engine", "Job")
-    query_set = Job.objects.all()
-    return query_set
+    return Job.objects.all()
 
 def _get_job_preview_path(jid):
     return os.path.join(settings.JOBS_ROOT, str(jid), "preview.jpeg")

@@ -132,8 +132,7 @@ class WebhookWriteSerializer(WriteOnceMixin, serializers.ModelSerializer):
         if (project_id := validated_data.get('project_id')) is not None:
             validated_data['organization'] = Project.objects.get(pk=project_id).organization
 
-        db_webhook = Webhook.objects.create(**validated_data)
-        return db_webhook
+        return Webhook.objects.create(**validated_data)
 
 
 class WebhookDeliveryReadSerializer(serializers.ModelSerializer):

@@ -69,7 +69,7 @@ class CvatExtractor(Extractor):
         return len(self._items)
 
     def get(self, _id, subset=DEFAULT_SUBSET_NAME):
-        assert subset in self._subsets, '{} not in {}'.format(subset, ', '.join(self._subsets))
+        assert subset in self._subsets, f"{subset} not in {', '.join(self._subsets)}"
         return super().get(_id, subset)
 
     @staticmethod
@@ -78,11 +78,8 @@ class CvatExtractor(Extractor):
         context = iter(context)
 
         for ev, el in context:
-            if ev == 'start':
-                if el.tag == 'subsets':
-                    if el.text is not None:
-                        subsets = el.text.split('\n')
-                        return subsets
+            if ev == 'start' and el.tag == 'subsets' and el.text is not None:
+                return el.text.split('\n')
             if ev == 'end':
                 if el.tag == 'meta':
                     return [DEFAULT_SUBSET_NAME]

@@ -12,9 +12,10 @@ from shared.utils.config import server_get
 class TestCachePolicy:
     @staticmethod
     def _get_js_bundle_url(response):
-        match = re.search(r'<script.* src="(/assets/cvat-ui.\w+.min.js)".*></script>', response)
-        if match:
-            return match.group(1)
+        if match := re.search(
+            r'<script.* src="(/assets/cvat-ui.\w+.min.js)".*></script>', response
+        ):
+            return match[1]
 
     def _test_cache_policy_enabled(self, response):
         assert response.status_code == HTTPStatus.OK

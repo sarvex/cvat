@@ -25,11 +25,10 @@ if settings.IAM_TYPE == 'BASIC':
             if allauth_settings.EMAIL_REQUIRED:
                 EmailAddress.objects.get_or_create(user=instance,
                     email=instance.email, primary=True, verified=True)
-        else: # don't need to add default groups for superuser
-            if created:
-                for role in settings.IAM_DEFAULT_ROLES:
-                    db_group = Group.objects.get(name=role)
-                    instance.groups.add(db_group)
+        elif created:
+            for role in settings.IAM_DEFAULT_ROLES:
+                db_group = Group.objects.get(name=role)
+                instance.groups.add(db_group)
 
 elif settings.IAM_TYPE == 'LDAP':
     def create_user(sender, user=None, ldap_user=None, **kwargs):

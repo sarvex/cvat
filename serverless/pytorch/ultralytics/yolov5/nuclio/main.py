@@ -22,19 +22,19 @@ def handler(context, event):
     image = Image.open(buf)
     yolo_results_json = context.user_data.model(image).pandas().xyxy[0].to_dict(orient='records')
 
-    encoded_results = []
-    for result in yolo_results_json:
-        encoded_results.append({
+    encoded_results = [
+        {
             'confidence': result['confidence'],
             'label': result['name'],
             'points': [
                 result['xmin'],
                 result['ymin'],
                 result['xmax'],
-                result['ymax']
+                result['ymax'],
             ],
-            'type': 'rectangle'
-        })
-
+            'type': 'rectangle',
+        }
+        for result in yolo_results_json
+    ]
     return context.Response(body=json.dumps(encoded_results), headers={},
         content_type='application/json', status_code=200)

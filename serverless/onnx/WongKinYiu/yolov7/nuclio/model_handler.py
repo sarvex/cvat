@@ -15,7 +15,7 @@ class ModelHandler:
 
     def load_network(self, model):
         device = ort.get_device()
-        cuda = True if device == 'GPU' else False
+        cuda = device == 'GPU'
         try:
             providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
             so = ort.SessionOptions()
@@ -70,8 +70,6 @@ class ModelHandler:
             im /= 255
 
             inp = {self.input_details[0]: im}
-            # ONNX inference
-            output = list()
             detections = self.model.run(self.output_details, inp)[0]
 
             # for det in detections:
@@ -82,11 +80,7 @@ class ModelHandler:
             boxes -= np.array(dwdh * 2)
             boxes /= ratio
             boxes = boxes.round().astype(np.int32)
-            output.append(boxes)
-            output.append(labels)
-            output.append(scores)
-            return output
-
+            return [boxes, labels, scores]
         except Exception as e:
             print(e)
 

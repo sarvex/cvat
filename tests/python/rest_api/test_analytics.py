@@ -113,7 +113,7 @@ class TestGetAuditEvents:
         while MAX_RETRIES > 0:
             data = self._test_get_audit_logs_as_csv()
             events = self._csv_to_dict(data)
-            request_ids = set(json.loads(e["payload"])["request"]["id"] for e in events)
+            request_ids = {json.loads(e["payload"])["request"]["id"] for e in events}
             if all(req_id in request_ids for req_id in expected_request_ids):
                 break
             MAX_RETRIES -= 1
@@ -149,21 +149,21 @@ class TestGetAuditEvents:
         res = []
         with StringIO(csv_data.decode()) as f:
             reader = csv.DictReader(f)
-            for row in reader:
-                res.append(row)
-
+            res.extend(iter(reader))
         return res
 
     @staticmethod
     def _filter_events(events, filter_):
-        res = []
-        for event in events:
+        return [
+            event
+            for event in events
             if all(
-                (event[filter_key] == filter_value for filter_key, filter_value in filter_.items())
-            ):
-                res.append(event)
-
-        return res
+                (
+                    event[filter_key] == filter_value
+                    for filter_key, filter_value in filter_.items()
+                )
+            )
+        ]
 
     def _test_get_audit_logs_as_csv(self, **kwargs):
         with make_api_client(self._USERNAME) as api_client:

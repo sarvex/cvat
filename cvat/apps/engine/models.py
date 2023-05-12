@@ -23,10 +23,10 @@ from cvat.apps.events.utils import cache_deleted
 
 class SafeCharField(models.CharField):
     def get_prep_value(self, value):
-        value = super().get_prep_value(value)
-        if value:
+        if value := super().get_prep_value(value):
             return value[:self.max_length]
-        return value
+        else:
+            return value
 
 
 class DimensionType(str, Enum):
@@ -211,7 +211,7 @@ class Data(models.Model):
 
     def get_frame_step(self):
         match = re.search(r"step\s*=\s*([1-9]\d*)", self.frame_filter)
-        return int(match.group(1)) if match else 1
+        return int(match[1]) if match else 1
 
     def get_data_dirname(self):
         return os.path.join(settings.MEDIA_DATA_ROOT, str(self.id))
@@ -234,7 +234,7 @@ class Data(models.Model):
         else:
             ext = 'list'
 
-        return '{}.{}'.format(chunk_number, ext)
+        return f'{chunk_number}.{ext}'
 
     def _get_compressed_chunk_name(self, chunk_number):
         return self._get_chunk_name(chunk_number, self.compressed_chunk_type)
@@ -267,8 +267,7 @@ class Data(models.Model):
     def get_uploaded_files(self):
         upload_dir = self.get_upload_dirname()
         uploaded_files = [os.path.join(upload_dir, file) for file in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, file))]
-        represented_files = [{'file':f} for f in uploaded_files]
-        return represented_files
+        return [{'file':f} for f in uploaded_files]
 
 class Video(models.Model):
     data = models.OneToOneField(Data, on_delete=models.CASCADE, related_name="video", null=True)
@@ -407,7 +406,7 @@ class MyFileSystemStorage(FileSystemStorage):
 
     def get_available_name(self, name, max_length=None):
         if self.exists(name) or (max_length and len(name) > max_length):
-            raise IOError('`{}` file already exists or its name is too long'.format(name))
+            raise IOError(f'`{name}` file already exists or its name is too long')
         return name
 
 def upload_path_handler(instance, filename):
@@ -457,7 +456,7 @@ class Segment(models.Model):
     stop_frame = models.IntegerField()
 
     def contains_frame(self, idx: int) -> bool:
-        return self.start_frame <= idx and idx <= self.stop_frame
+        return self.start_frame <= idx <= self.stop_frame
 
     class Meta:
         default_permissions = ()
@@ -545,9 +544,7 @@ class Label(models.Model):
     def get_organization_id(self):
         if self.project is not None:
             return self.project.organization.id
-        if self.task is not None:
-            return self.task.organization.id
-        return None
+        return self.task.organization.id if self.task is not None else None
 
     class Meta:
         default_permissions = ()
@@ -796,7 +793,7 @@ class Manifest(models.Model):
     cloud_storage = models.ForeignKey('CloudStorage', on_delete=models.CASCADE, null=True, related_name='manifests')
 
     def __str__(self):
-        return '{}'.format(self.filename)
+        return f'{self.filename}'
 
 class Location(str, Enum):
     CLOUD_STORAGE = 'cloud_storage'
@@ -844,7 +841,7 @@ class CloudStorage(models.Model):
         default_permissions = ()
 
     def __str__(self):
-        return "{} {} {}".format(self.provider_type, self.display_name, self.id)
+        return f"{self.provider_type} {self.display_name} {self.id}"
 
     def get_storage_dirname(self):
         return os.path.join(settings.CLOUD_STORAGE_ROOT, str(self.id))

@@ -126,15 +126,17 @@ class _DbTestBase(APITestCase):
 
     def _put_api_v2_task_id_annotations(self, tid, data):
         with ForceLogin(self.admin, self.client):
-            response = self.client.put("/api/tasks/%s/annotations" % tid,
-                data=data, format="json")
+            response = self.client.put(
+                f"/api/tasks/{tid}/annotations", data=data, format="json"
+            )
 
         return response
 
     def _put_api_v2_job_id_annotations(self, jid, data):
         with ForceLogin(self.admin, self.client):
-            response = self.client.put("/api/jobs/%s/annotations" % jid,
-                data=data, format="json")
+            response = self.client.put(
+                f"/api/jobs/{jid}/annotations", data=data, format="json"
+            )
 
         return response
 
@@ -156,16 +158,19 @@ class _DbTestBase(APITestCase):
             assert response.status_code == status.HTTP_201_CREATED, response.status_code
             tid = response.data["id"]
 
-            response = self.client.post("/api/tasks/%s/data" % tid,
-                data=image_data)
+            response = self.client.post(f"/api/tasks/{tid}/data", data=image_data)
             assert response.status_code == status.HTTP_202_ACCEPTED, response.status_code
 
-            response = self.client.get("/api/tasks/%s" % tid)
+            response = self.client.get(f"/api/tasks/{tid}")
 
             if 200 <= response.status_code < 400:
-                labels_response = list(get_paginated_collection(
-                    lambda page: self.client.get("/api/labels?task_id=%s&page=%s" % (tid, page))
-                ))
+                labels_response = list(
+                    get_paginated_collection(
+                        lambda page: self.client.get(
+                            f"/api/labels?task_id={tid}&page={page}"
+                        )
+                    )
+                )
                 response.data["labels"] = labels_response
 
             task = response.data
@@ -182,8 +187,10 @@ class _DbTestBase(APITestCase):
 
     def _get_jobs(self, task_id):
         with ForceLogin(self.admin, self.client):
-            values = get_paginated_collection(lambda page:
-                self.client.get("/api/jobs?task_id={}&page={}".format(task_id, page))
+            values = get_paginated_collection(
+                lambda page: self.client.get(
+                    f"/api/jobs?task_id={task_id}&page={page}"
+                )
             )
         return values
 
@@ -959,7 +966,7 @@ class TaskDumpUploadTest(_DbTestBase):
                     if dump_format_name in [
                         "Market-1501 1.0",
                         "ICDAR Localization 1.0", "ICDAR Recognition 1.0", \
-                        "ICDAR Segmentation 1.0", "COCO Keypoints 1.0",
+                            "ICDAR Segmentation 1.0", "COCO Keypoints 1.0",
                     ]:
                         task = self._create_task(tasks[dump_format_name], images)
                     else:
@@ -993,7 +1000,10 @@ class TaskDumpUploadTest(_DbTestBase):
 
                     self._create_annotations(task, "CVAT for images 1.1 many jobs", "default")
 
-                    if dump_format_name == "CVAT for images 1.1" or dump_format_name == "CVAT for video 1.1":
+                    if dump_format_name in [
+                        "CVAT for images 1.1",
+                        "CVAT for video 1.1",
+                    ]:
                         dump_format_name = "CVAT 1.1"
                     url = self._generate_url_upload_tasks_annotations(task_id, dump_format_name)
 

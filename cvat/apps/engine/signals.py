@@ -14,8 +14,7 @@ from .models import (CloudStorage, Data, Job, Profile, Project,
 # analytics feature is available. Now the log system can write information
 # into a file inside removed directory.
 
-@receiver(post_save, sender=Job,
-    dispatch_uid=__name__ + ".save_job_handler")
+@receiver(post_save, sender=Job, dispatch_uid=f"{__name__}.save_job_handler")
 def __save_job_handler(instance, created, **kwargs):
     # no need to update task status for newly created jobs
     if created:
@@ -33,21 +32,18 @@ def __save_job_handler(instance, created, **kwargs):
         db_task.status = status
         db_task.save()
 
-@receiver(post_save, sender=User,
-    dispatch_uid=__name__ + ".save_user_handler")
+@receiver(post_save, sender=User, dispatch_uid=f"{__name__}.save_user_handler")
 def __save_user_handler(instance, **kwargs):
     if not hasattr(instance, 'profile'):
         profile = Profile()
         profile.user = instance
         profile.save()
 
-@receiver(post_delete, sender=Project,
-    dispatch_uid=__name__ + ".delete_project_handler")
+@receiver(post_delete, sender=Project, dispatch_uid=f"{__name__}.delete_project_handler")
 def __delete_project_handler(instance, **kwargs):
     shutil.rmtree(instance.get_dirname(), ignore_errors=True)
 
-@receiver(post_delete, sender=Task,
-    dispatch_uid=__name__ + ".delete_task_handler")
+@receiver(post_delete, sender=Task, dispatch_uid=f"{__name__}.delete_task_handler")
 def __delete_task_handler(instance, **kwargs):
     shutil.rmtree(instance.get_dirname(), ignore_errors=True)
     if instance.data and not instance.data.tasks.exists():
@@ -60,17 +56,14 @@ def __delete_task_handler(instance, **kwargs):
     except Project.DoesNotExist:
         pass # probably the project has been deleted
 
-@receiver(post_delete, sender=Job,
-    dispatch_uid=__name__ + ".delete_job_handler")
+@receiver(post_delete, sender=Job, dispatch_uid=f"{__name__}.delete_job_handler")
 def __delete_job_handler(instance, **kwargs):
     shutil.rmtree(instance.get_dirname(), ignore_errors=True)
 
-@receiver(post_delete, sender=Data,
-    dispatch_uid=__name__ + ".delete_data_handler")
+@receiver(post_delete, sender=Data, dispatch_uid=f"{__name__}.delete_data_handler")
 def __delete_data_handler(instance, **kwargs):
     shutil.rmtree(instance.get_data_dirname(), ignore_errors=True)
 
-@receiver(post_delete, sender=CloudStorage,
-    dispatch_uid=__name__ + ".delete_cloudstorage_handler")
+@receiver(post_delete, sender=CloudStorage, dispatch_uid=f"{__name__}.delete_cloudstorage_handler")
 def __delete_cloudstorage_handler(instance, **kwargs):
     shutil.rmtree(instance.get_storage_dirname(), ignore_errors=True)

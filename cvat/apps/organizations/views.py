@@ -81,7 +81,7 @@ class OrganizationViewSet(viewsets.GenericViewSet,
     def perform_create(self, serializer):
         extra_kwargs = { 'owner': self.request.user }
         if not serializer.validated_data.get('name'):
-            extra_kwargs.update({ 'name': serializer.validated_data['slug'] })
+            extra_kwargs['name'] = serializer.validated_data['slug']
         serializer.save(**extra_kwargs)
 
     class Meta:

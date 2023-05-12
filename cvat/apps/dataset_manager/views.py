@@ -22,13 +22,14 @@ from cvat.apps.engine.models import Project, Task, Job
 from .formats.registry import EXPORT_FORMATS, IMPORT_FORMATS
 from .util import current_function_name
 
-_MODULE_NAME = __package__ + '.' + osp.splitext(osp.basename(__file__))[0]
+_MODULE_NAME = f'{__package__}.{osp.splitext(osp.basename(__file__))[0]}'
 def log_exception(logger=None, exc_info=True):
     if logger is None:
         logger = slogger
-    logger.exception("[%s @ %s]: exception occurred" % \
-            (_MODULE_NAME, current_function_name(2)),
-        exc_info=exc_info)
+    logger.exception(
+        f"[{_MODULE_NAME} @ {current_function_name(2)}]: exception occurred",
+        exc_info=exc_info,
+    )
 
 
 def get_export_cache_dir(db_instance):
@@ -37,7 +38,9 @@ def get_export_cache_dir(db_instance):
     if osp.isdir(base_dir):
         return osp.join(base_dir, 'export_cache')
     else:
-        raise FileNotFoundError('{} dir {} does not exist'.format(db_instance.__class__.__name__, base_dir))
+        raise FileNotFoundError(
+            f'{db_instance.__class__.__name__} dir {base_dir} does not exist'
+        )
 
 DEFAULT_CACHE_TTL = timedelta(hours=10)
 TASK_CACHE_TTL = DEFAULT_CACHE_TTL
@@ -66,9 +69,8 @@ def export(dst_format, project_id=None, task_id=None, job_id=None, server_url=No
         cache_dir = get_export_cache_dir(db_instance)
 
         exporter = EXPORT_FORMATS[dst_format]
-        output_base = '%s_%s' % ('dataset' if save_images else 'annotations',
-            make_file_name(to_snake_case(dst_format)))
-        output_path = '%s.%s' % (output_base, exporter.EXT)
+        output_base = f"{'dataset' if save_images else 'annotations'}_{make_file_name(to_snake_case(dst_format))}"
+        output_path = f'{output_base}.{exporter.EXT}'
         output_path = osp.join(cache_dir, output_path)
 
         instance_time = timezone.localtime(db_instance.updated_date).timestamp()
@@ -93,14 +95,8 @@ def export(dst_format, project_id=None, task_id=None, job_id=None, server_url=No
                 file_ctime=archive_ctime,
                 logger=logger)
             logger.info(
-                "The {} '{}' is exported as '{}' at '{}' "
-                "and available for downloading for the next {}. "
-                "Export cache cleaning job is enqueued, id '{}'".format(
-                    db_instance.__class__.__name__.lower(),
-                    db_instance.name if isinstance(db_instance, (Project, Task)) else db_instance.id,
-                    dst_format, output_path, cache_ttl,
-                    cleaning_job.id
-                ))
+                f"The {db_instance.__class__.__name__.lower()} '{db_instance.name if isinstance(db_instance, (Project, Task)) else db_instance.id}' is exported as '{dst_format}' at '{output_path}' and available for downloading for the next {cache_ttl}. Export cache cleaning job is enqueued, id '{cleaning_job.id}'"
+            )
 
         return output_path
     except Exception:
@@ -131,9 +127,7 @@ def clear_export_cache(file_path, file_ctime, logger):
         if osp.exists(file_path) and osp.getctime(file_path) == file_ctime:
             os.remove(file_path)
 
-            logger.info(
-                "Export cache file '{}' successfully removed" \
-                .format(file_path))
+            logger.info(f"Export cache file '{file_path}' successfully removed")
     except Exception:
         log_exception(logger)
         raise

@@ -123,7 +123,7 @@ class FrameProvider:
     def _validate_frame_number(self, frame_number):
         frame_number_ = int(frame_number)
         if frame_number_ < 0 or frame_number_ >= self._db_data.size:
-            raise ValidationError('Incorrect requested frame number: {}'.format(frame_number_))
+            raise ValidationError(f'Incorrect requested frame number: {frame_number_}')
 
         chunk_number = frame_number_ // self._db_data.chunk_size
         frame_offset = frame_number_ % self._db_data.chunk_size
@@ -146,7 +146,7 @@ class FrameProvider:
         image = av_frame.to_ndarray(format='bgr24')
         success, result = cv2.imencode(ext, image)
         if not success:
-            raise RuntimeError("Failed to encode image to '%s' format" % (ext))
+            raise RuntimeError(f"Failed to encode image to '{ext}' format")
         return BytesIO(result.tobytes())
 
     def _convert_frame(self, frame, reader_class, out_type):

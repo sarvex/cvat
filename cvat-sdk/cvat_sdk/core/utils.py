@@ -61,7 +61,7 @@ def atomic_writer(
     for counter in itertools.count():
         tmp_path = f"{path_str}.tmp{counter}"
 
-        try:
+        with contextlib.suppress(FileExistsError):
             if mode == "w":
                 tmp_file = open(tmp_path, "xt", encoding=encoding)
             elif mode == "wb":
@@ -70,9 +70,6 @@ def atomic_writer(
                 raise ValueError(f"Unsupported mode: {mode!r}")
 
             break
-        except FileExistsError:
-            pass  # try next counter value
-
     try:
         with tmp_file:
             yield tmp_file
