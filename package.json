@@ -62,7 +62,7 @@
     "remark-frontmatter": "^3.0.0",
     "remark-gfm": "^1.0.0",
     "remark-lint-emphasis-marker": "^2.0.0",
-    "remark-lint-list-item-spacing": "^2.0.0",
+    "remark-lint-list-item-spacing": "^4.1.2",
     "remark-lint-maximum-heading-length": "^2.0.0",
     "remark-lint-maximum-line-length": "^2.0.0",
     "remark-lint-no-dead-urls": "^1.0.2",
