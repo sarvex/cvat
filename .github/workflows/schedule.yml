@@ -307,14 +307,14 @@ jobs:
 
       - name: Uploading cypress screenshots as an artifact
         if: failure()
-        uses: actions/upload-artifact@v3.1.1
+        uses: actions/upload-artifact@v3.1.2
         with:
           name: cypress_screenshots
           path: ${{ github.workspace }}/tests/cypress/screenshots
 
       - name: Uploading "cvat" container logs as an artifact
         if: failure()
-        uses: actions/upload-artifact@v3.1.1
+        uses: actions/upload-artifact@v3.1.2
         with:
           name: cvat_container_logs
           path: ${{ github.workspace }}/tests/cvat.log
